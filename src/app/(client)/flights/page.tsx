@@ -1,162 +1,210 @@
-import Link from "next/link";
-import { ShieldCheck, Clock3, Wallet, ArrowRight } from "lucide-react";
-import { FlightSearchBar } from "@/components/client/flight-search-bar";
-import { MOCK_AIRLINES } from "@/lib/mock/airports-airlines";
+"use client";
 
-const PERKS = [
-  {
-    icon: ShieldCheck,
-    title: "Fare protection",
-    body: "Business and First cabins are fully refundable — cancel from My Bookings any time before departure.",
-  },
-  {
-    icon: Clock3,
-    title: "Real-time status",
-    body: "Departure boards update the moment a gate, delay, or aircraft swap is confirmed by the carrier.",
-  },
-  {
-    icon: Wallet,
-    title: "Transparent pricing",
-    body: "Base fares include taxes. What you see on the results page is what you pay at checkout.",
-  },
-];
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { PlaneTakeoff, SlidersHorizontal, ArrowUpDown, X } from "lucide-react";
+import { Flight } from "@/types";
+import { api } from "@/lib/api/client";
+import { FlightCard } from "@/components/client/flight-card";
+import { FlightFilterSidebar, FlightFilters } from "@/components/client/flight-filter-sidebar";
+import { EmptyState } from "@/components/ui/empty-state";
+import { findAirport } from "@/lib/mock/airports-airlines";
+import { Button } from "@/components/ui/button";
 
-const DESTINATIONS = [
-  { city: "Tokyo", code: "NRT", price: 412 },
-  { city: "Singapore", code: "SIN", price: 198 },
-  { city: "Seoul", code: "ICN", price: 356 },
-  { city: "Sydney", code: "SYD", price: 588 },
-  { city: "London", code: "LHR", price: 742 },
-  { city: "Dubai", code: "DXB", price: 469 },
-];
+type SortKey = "price-asc" | "price-desc" | "departure-asc" | "duration-asc";
 
-export default function HomePage() {
+export default function FlightsPage() {
   return (
-    <div>
-      {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden bg-aviation-950 pb-32 pt-16 sm:pt-24">
-        {/* Ambient flight-path graphic */}
-        <svg
-          className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.15]"
-          viewBox="0 0 1200 600"
-          preserveAspectRatio="none"
-          aria-hidden
-        >
-          <path
-            d="M -50 480 Q 300 380 600 420 T 1250 280"
-            stroke="#38BDF8"
-            strokeWidth="2"
-            strokeDasharray="6 10"
-            fill="none"
-          />
-          <path
-            d="M -50 180 Q 350 60 650 140 T 1250 480"
-            stroke="#0EA5E9"
-            strokeWidth="2"
-            strokeDasharray="2 8"
-            fill="none"
-          />
-          <circle cx="600" cy="420" r="3" fill="#38BDF8" />
-          <circle cx="1250" cy="280" r="3" fill="#38BDF8" />
-        </svg>
+    <Suspense fallback={<FlightsPageSkeleton />}>
+      <FlightsPageInner />
+    </Suspense>
+  );
+}
 
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1.5 text-xs font-semibold text-sky-300 ring-1 ring-white/10">
-              Now flying to 10 hubs across 6 countries
-            </span>
-            <h1 className="mt-5 font-display text-4xl font-bold leading-tight text-white sm:text-5xl">
-              Fly farther for less,
-              <br />
-              land exactly on time.
-            </h1>
-            <p className="mt-4 text-base text-slate-300 sm:text-lg">
-              Compare live fares across Economy through First, lock in your seats, and manage every
-              trip from one dashboard.
-            </p>
-          </div>
+function FlightsPageSkeleton() {
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="h-8 w-64 animate-pulse rounded-lg bg-slate-100" />
+      <div className="mt-6 space-y-3">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-28 animate-pulse rounded-2xl bg-slate-100" />
+        ))}
+      </div>
+    </div>
+  );
+}
 
-          <div className="mx-auto mt-10 max-w-4xl">
-            <FlightSearchBar />
-          </div>
-        </div>
-      </section>
+function FlightsPageInner() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
-      {/* ── Perks ────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-          {PERKS.map((perk) => (
-            <div key={perk.title} className="flight-strip rounded-2xl border border-slate-200 bg-white p-6 pl-7">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100 text-aviation-900">
-                <perk.icon className="h-5 w-5" />
-              </span>
-              <h3 className="mt-4 font-display text-base font-semibold text-slate-900">{perk.title}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-slate-500">{perk.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+  const from = searchParams.get("from") ?? "";
+  const to = searchParams.get("to") ?? "";
+  const startDate = searchParams.get("startDate") ?? "";
+  const endDate = searchParams.get("endDate") ?? "";
 
-      {/* ── Popular destinations ─────────────────────────────── */}
-      <section className="bg-slate-50 py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-sky-600">Fare watch</p>
-              <h2 className="mt-1 font-display text-2xl font-bold text-slate-900 sm:text-3xl">
-                Popular this week from Ho Chi Minh City
-              </h2>
-            </div>
-            <Link
-              href="/flights?from=SGN&to=NRT"
-              className="hidden items-center gap-1 text-sm font-semibold text-aviation-900 hover:text-sky-600 sm:flex"
-            >
-              View all routes <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
+  const [flights, setFlights] = useState<Flight[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sort, setSort] = useState<SortKey>("price-asc");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [filters, setFilters] = useState<FlightFilters>({
+    cabins: [],
+    airlines: [],
+    maxPrice: 2000,
+  });
 
-          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {DESTINATIONS.map((d) => (
-              <Link
-                key={d.code}
-                href={`/flights?from=SGN&to=${d.code}`}
-                className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 transition-all hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md"
-              >
-                <div>
-                  <p className="font-display text-lg font-bold text-slate-900">{d.city}</p>
-                  <p className="font-mono-data text-xs text-slate-400">SGN → {d.code}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-display tabular text-xl font-bold text-aviation-900">${d.price}</p>
-                  <p className="text-xs text-slate-400">round-trip from</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+  useEffect(() => {
+    let active = true;
+    Promise.resolve().then(() => {
+      if (active) setLoading(true);
+    });
+    api.flights.search({ from, to, startDate, endDate }).then((results) => {
+      if (!active) return;
+      setFlights(results);
+      const ceiling = Math.max(
+        ...results.map((f) => Math.min(...f.fareRules.map((r) => r.basePrice))),
+        200
+      );
+      setFilters((f) => ({ ...f, maxPrice: Math.ceil(ceiling / 10) * 10 }));
+      setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [from, to, startDate, endDate]);
 
-      {/* ── Airlines strip ───────────────────────────────────── */}
-      <section className="border-t border-slate-100 py-12">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <p className="text-center text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Operated in partnership with
+  const priceCeiling = useMemo(() => {
+    if (flights.length === 0) return 2000;
+    return Math.ceil(
+      Math.max(...flights.map((f) => Math.min(...f.fareRules.map((r) => r.basePrice)))) / 10
+    ) * 10;
+  }, [flights]);
+
+  const filtered = useMemo(() => {
+    let result = flights.filter((f) => {
+      const cheapest = Math.min(...f.fareRules.map((r) => r.basePrice));
+      if (cheapest > filters.maxPrice) return false;
+      if (filters.airlines.length && !filters.airlines.includes(f.airline.iataCarrierCode)) return false;
+      if (filters.cabins.length && !f.fareRules.some((r) => filters.cabins.includes(r.cabin))) return false;
+      return true;
+    });
+
+    result = [...result].sort((a, b) => {
+      const aCheap = Math.min(...a.fareRules.map((r) => r.basePrice));
+      const bCheap = Math.min(...b.fareRules.map((r) => r.basePrice));
+      switch (sort) {
+        case "price-asc": return aCheap - bCheap;
+        case "price-desc": return bCheap - aCheap;
+        case "departure-asc": return a.departureTime.localeCompare(b.departureTime);
+        case "duration-asc": {
+          const aDur = new Date(a.arrivalTime).getTime() - new Date(a.departureTime).getTime();
+          const bDur = new Date(b.arrivalTime).getTime() - new Date(b.departureTime).getTime();
+          return aDur - bDur;
+        }
+      }
+    });
+
+    return result;
+  }, [flights, filters, sort]);
+
+  const fromAirport = findAirport(from);
+  const toAirport = findAirport(to);
+
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="font-display text-2xl font-bold text-slate-900">
+            {fromAirport && toAirport
+              ? `${fromAirport.city} → ${toAirport.city}`
+              : "All available flights"}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {loading ? "Searching live availability…" : `${filtered.length} flight${filtered.length === 1 ? "" : "s"} found`}
+            {startDate && endDate && ` · ${startDate} to ${endDate}`}
           </p>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-10 gap-y-4">
-            {MOCK_AIRLINES.map((al) => (
-              <div key={al.id} className="flex items-center gap-2 text-slate-500">
-                <span
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold text-white"
-                  style={{ backgroundColor: al.logoColor }}
-                >
-                  {al.iataCarrierCode}
-                </span>
-                <span className="text-sm font-semibold">{al.operatorName}</span>
-              </div>
-            ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setMobileFiltersOpen(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-semibold text-slate-700 lg:hidden"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Filters
+          </button>
+          <div className="relative">
+            <ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortKey)}
+              className="h-11 appearance-none rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm font-semibold text-slate-700 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+            >
+              <option value="price-asc">Price: low to high</option>
+              <option value="price-desc">Price: high to low</option>
+              <option value="departure-asc">Departure time</option>
+              <option value="duration-asc">Shortest duration</option>
+            </select>
           </div>
         </div>
-      </section>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[260px_1fr]">
+        <aside className="hidden lg:block">
+          <div className="sticky top-24 rounded-2xl border border-slate-200 bg-white p-5">
+            <h2 className="font-display text-sm font-bold text-slate-900">Refine results</h2>
+            <div className="mt-4">
+              <FlightFilterSidebar filters={filters} onChange={setFilters} priceCeiling={priceCeiling} />
+            </div>
+          </div>
+        </aside>
+
+        <div className="min-w-0">
+          {loading ? (
+            <div className="space-y-3">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-28 animate-pulse rounded-2xl bg-slate-100" />
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
+            <EmptyState
+              icon={PlaneTakeoff}
+              title="No flights match your search"
+              description="Try widening your date range, clearing filters, or picking a different route."
+              action={
+                <Button variant="outline" size="sm" onClick={() => router.push("/")}>
+                  Start a new search
+                </Button>
+              }
+            />
+          ) : (
+            <div className="space-y-3">
+              {filtered.map((flight) => (
+                <FlightCard key={flight.id} flight={flight} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {mobileFiltersOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="absolute inset-0 bg-slate-900/50" onClick={() => setMobileFiltersOpen(false)} />
+          <div className="absolute bottom-0 left-0 right-0 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-white p-5">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-base font-bold text-slate-900">Refine results</h2>
+              <button onClick={() => setMobileFiltersOpen(false)} className="rounded-lg p-1.5 hover:bg-slate-100">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mt-4">
+              <FlightFilterSidebar filters={filters} onChange={setFilters} priceCeiling={priceCeiling} />
+            </div>
+            <Button fullWidth className="mt-5" onClick={() => setMobileFiltersOpen(false)}>
+              Show {filtered.length} flights
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
