@@ -8,7 +8,6 @@ import { api } from "@/lib/api/client";
 import { FlightCard } from "@/components/client/flight-card";
 import { FlightFilterSidebar, FlightFilters } from "@/components/client/flight-filter-sidebar";
 import { EmptyState } from "@/components/ui/empty-state";
-import { findAirport } from "@/lib/mock/airports-airlines";
 import { Button } from "@/components/ui/button";
 
 type SortKey = "price-asc" | "price-desc" | "departure-asc" | "duration-asc";
@@ -61,11 +60,14 @@ function FlightsPageInner() {
     api.flights.search({ from, to, startDate, endDate }).then((results) => {
       if (!active) return;
       setFlights(results);
-      const ceiling = Math.max(
-        ...results.map((f) => Math.min(...f.fareRules.map((r) => r.basePrice))),
-        200
+      const prices = results.flatMap((f) =>
+        (f.fareRules ?? []).map((r) => r.basePrice)
       );
+      const ceiling = prices.length > 0 ? Math.max(...prices) : 2000;
       setFilters((f) => ({ ...f, maxPrice: Math.ceil(ceiling / 10) * 10 }));
+      setLoading(false);
+    }).catch(() => {
+      if (!active) return;
       setLoading(false);
     });
     return () => {
@@ -75,23 +77,26 @@ function FlightsPageInner() {
 
   const priceCeiling = useMemo(() => {
     if (flights.length === 0) return 2000;
-    return Math.ceil(
-      Math.max(...flights.map((f) => Math.min(...f.fareRules.map((r) => r.basePrice)))) / 10
-    ) * 10;
+    const prices = flights.flatMap((f) => (f.fareRules ?? []).map((r) => r.basePrice));
+    if (!prices.length) return 2000;
+    return Math.ceil(Math.max(...prices) / 10) * 10;
   }, [flights]);
 
   const filtered = useMemo(() => {
     let result = flights.filter((f) => {
-      const cheapest = Math.min(...f.fareRules.map((r) => r.basePrice));
+      const rules = f.fareRules ?? [];
+      const cheapest = rules.length ? Math.min(...rules.map((r) => r.basePrice)) : 0;
       if (cheapest > filters.maxPrice) return false;
-      if (filters.airlines.length && !filters.airlines.includes(f.airline.iataCarrierCode)) return false;
-      if (filters.cabins.length && !f.fareRules.some((r) => filters.cabins.includes(r.cabin))) return false;
+      // iataCarrierCode is added by normalizeAirline
+      const airlineCode = (f.airline as (typeof f.airline & { iataCarrierCode?: string }))?.iataCarrierCode ?? f.airline?.code ?? "";
+      if (filters.airlines.length && !filters.airlines.includes(airlineCode)) return false;
+      if (filters.cabins.length && !rules.some((r) => filters.cabins.includes(r.cabin))) return false;
       return true;
     });
 
     result = [...result].sort((a, b) => {
-      const aCheap = Math.min(...a.fareRules.map((r) => r.basePrice));
-      const bCheap = Math.min(...b.fareRules.map((r) => r.basePrice));
+      const aCheap = a.fareRules?.length ? Math.min(...a.fareRules.map((r) => r.basePrice)) : 0;
+      const bCheap = b.fareRules?.length ? Math.min(...b.fareRules.map((r) => r.basePrice)) : 0;
       switch (sort) {
         case "price-asc": return aCheap - bCheap;
         case "price-desc": return bCheap - aCheap;
@@ -107,16 +112,17 @@ function FlightsPageInner() {
     return result;
   }, [flights, filters, sort]);
 
-  const fromAirport = findAirport(from);
-  const toAirport = findAirport(to);
+  // Derive city names from returned flight data (no mock lookup needed)
+  const fromCity = flights[0]?.departureAirport?.city ?? from;
+  const toCity   = flights[0]?.destinationAirport?.city ?? to;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold text-slate-900">
-            {fromAirport && toAirport
-              ? `${fromAirport.city} → ${toAirport.city}`
+            {from && to
+              ? `${fromCity} → ${toCity}`
               : "All available flights"}
           </h1>
           <p className="mt-1 text-sm text-slate-500">

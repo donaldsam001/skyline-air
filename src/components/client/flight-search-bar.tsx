@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRightLeft, MapPin, CalendarDays, Search } from "lucide-react";
+import { Airport } from "@/types";
+import { api } from "@/lib/api/client";
 import { MOCK_AIRPORTS } from "@/lib/mock/airports-airlines";
 import { Button } from "@/components/ui/button";
 
@@ -18,6 +20,17 @@ export function FlightSearchBar() {
   const [to, setTo] = useState("HAN");
   const [startDate, setStartDate] = useState(todayISO(1));
   const [endDate, setEndDate] = useState(todayISO(7));
+  // Airports loaded from live API; fall back to mock so the widget is
+  // immediately usable without a backend connection.
+  const [airports, setAirports] = useState<(Airport & { iataCode: string })[]>(
+    () => MOCK_AIRPORTS.map((a) => ({ ...a, iataCode: a.iataCode }))
+  );
+
+  useEffect(() => {
+    api.airports.getAll().then((data) => {
+      if (data.length > 0) setAirports(data as (Airport & { iataCode: string })[]);
+    }).catch(() => { /* keep mock fallback */ });
+  }, []);
 
   function swap() {
     setFrom(to);
@@ -49,16 +62,16 @@ export function FlightSearchBar() {
               onChange={(e) => setFrom(e.target.value)}
               className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm font-semibold text-slate-900 focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-500/20"
             >
-              {MOCK_AIRPORTS.map((a) => (
-                <option key={a.id} value={a.iataCode}>
-                  {a.city} ({a.iataCode})
+              {airports.map((a) => (
+                <option key={a.code} value={a.code}>
+                  {a.city ?? a.name} ({a.code})
                 </option>
               ))}
             </select>
           </div>
         </div>
 
-        {/* Swap button */}
+        {/* Swap */}
         <button
           type="button"
           onClick={swap}
@@ -81,9 +94,9 @@ export function FlightSearchBar() {
               onChange={(e) => setTo(e.target.value)}
               className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm font-semibold text-slate-900 focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-500/20"
             >
-              {MOCK_AIRPORTS.map((a) => (
-                <option key={a.id} value={a.iataCode}>
-                  {a.city} ({a.iataCode})
+              {airports.map((a) => (
+                <option key={a.code} value={a.code}>
+                  {a.city ?? a.name} ({a.code})
                 </option>
               ))}
             </select>

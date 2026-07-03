@@ -1,15 +1,13 @@
 import { create } from "zustand";
 import { User } from "@/types";
-import { MOCK_USERS } from "@/lib/mock/users";
 
 interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
-  login: (email: string, password: string) => Promise<{ ok: boolean; code?: number }>;
+  login: (username: string, password: string) => Promise<{ ok: boolean; code?: number }>;
   logout: () => void;
-  hydrateDemoCustomer: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -18,36 +16,45 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
   isAdmin: false,
 
-  login: async (email: string, password: string) => {
-    // Simulated /airplane/auth/token exchange against mock directory.
-    await new Promise((r) => setTimeout(r, 450));
-    const user = MOCK_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
+  login: async (username, password) => {
+    try {
+      // Connects to the /auth/token endpoint defined in AuthenticationController.java
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // Ensure keys match your AuthenticationRequest DTO fields
+        body: JSON.stringify({ username, password }), 
+      });
 
-    if (!user) return { ok: false, code: 1006 };
-    if (!user.isActive) return { ok: false, code: 1010 };
-    if (password.length < 4) return { ok: false, code: 1007 };
+      if (!response.ok) return { ok: false, code: response.status === 401 ? 1006 : 500 };
 
-    set({
-      user,
-      token: `mock-jwt-${user.id}`,
-      isAuthenticated: true,
-      isAdmin: user.roles.some((r) => r.name === "ADMIN"),
-    });
-    return { ok: true };
+      // Backend wraps the payload in APIResponse.result
+      const data = await response.json();
+      const authResult = data.result; 
+
+      if (!authResult || !authResult.authenticated) {
+        return { ok: false, code: 1006 };
+      }
+
+      set({
+        // Extract token and user details from the AuthenticationResponse
+        token: authResult.token,
+        isAuthenticated: true,
+        // Depending on your API, you may need a separate GET /users/my-info call here
+        // to populate the User object fully if it's not included in the token response.
+        user: { email: username } as User, 
+        isAdmin: false, // Update logic based on how roles are returned in your JWT
+      });
+      
+      return { ok: true };
+    } catch (error) {
+      console.error("Login Error:", error);
+      return { ok: false, code: 500 };
+    }
   },
 
   logout: () => {
+    // Optionally trigger POST /auth/logout here
     set({ user: null, token: null, isAuthenticated: false, isAdmin: false });
-  },
-
-  hydrateDemoCustomer: () => {
-    if (get().isAuthenticated) return;
-    const demo = MOCK_USERS.find((u) => u.email === "linh.tran@example.com")!;
-    set({
-      user: demo,
-      token: `mock-jwt-${demo.id}`,
-      isAuthenticated: true,
-      isAdmin: false,
-    });
   },
 }));

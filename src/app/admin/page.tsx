@@ -1,13 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
-import { CalendarRange, Ticket, Users, CreditCard, TrendingUp, ArrowRight } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { CalendarRange, Ticket, Users, CreditCard, TrendingUp, ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge, bookingStatusTone, paymentStatusTone } from "@/components/ui/badge";
-import { MOCK_FLIGHTS } from "@/lib/mock/flights";
-import { MOCK_BOOKINGS } from "@/lib/mock/bookings";
-import { MOCK_USERS } from "@/lib/mock/users";
+import { adminApi } from "@/lib/api/admin-client";
 import {
   BOOKING_STATUS_LABELS,
   formatCurrency,
@@ -15,27 +13,87 @@ import {
 } from "@/lib/utils";
 
 export default function AdminDashboardPage() {
-  const stats = useMemo(() => {
-    const activeBookings = MOCK_BOOKINGS.filter((b) => b.status === "CREATED" || b.status === "CONFIRMED").length;
-    const totalRevenue = MOCK_BOOKINGS.filter((b) => b.paymentStatus === "PAID").reduce((sum, b) => sum + b.totalPrice, 0);
-    const pendingPayments = MOCK_BOOKINGS.filter((b) => b.paymentStatus === "PENDING").length;
-    return {
-      totalFlights: MOCK_FLIGHTS.length,
-      activeBookings,
-      registeredUsers: MOCK_USERS.length,
-      totalRevenue,
-      pendingPayments,
-    };
+  const [flights, setFlights] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function fetchData() {
+      try {
+        // Fetch the correct entities for the dashboard metrics
+        const [flightsData, bookingsData, usersData, paymentsData] = await Promise.all([
+          adminApi.flights.getAll(),
+          adminApi.bookings.getAll(),
+          adminApi.users.getAll(),
+          adminApi.payments.getAll(),
+        ]);
+
+        if (mounted) {
+          setFlights(flightsData || []);
+          setBookings(bookingsData || []);
+          setUsers(usersData || []);
+          setPayments(paymentsData || []);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Failed to load admin dashboard data:", error);
+        if (mounted) setLoading(false);
+      }
+    }
+
+    fetchData();
+
+    return () => { mounted = false; };
   }, []);
 
-  const upcomingFlights = useMemo(
-    () =>
-      [...MOCK_FLIGHTS]
-        .filter((f) => new Date(f.departureTime) > new Date())
-        .sort((a, b) => a.departureTime.localeCompare(b.departureTime))
-        .slice(0, 5),
-    []
-  );
+  const stats = useMemo(() => {
+    // Safely calculate stats based on the fetched data
+    const activeBookings = bookings.filter(b => b.status === "CREATED" || b.status === "CONFIRMED").length;
+    
+    // Assuming payments have a 'status' (e.g., PENDING) and an 'amount'
+    const pendingPayments = payments.filter(p => p.paymentStatus === "PENDING").length;
+    const totalRevenue = payments
+      .filter(p => p.paymentStatus === "COMPLETED" || p.paymentStatus === "SUCCESS")
+      .reduce((sum, p) => sum + (p.amount || 0), 0);
+      
+    const activeUsers = users.filter(u => u.active !== false).length; // Adjust based on your User entity
+
+    return {
+      totalFlights: flights.length,
+      activeBookings,
+      registeredUsers: users.length,
+      activeUsers,
+      pendingPayments,
+      totalRevenue,
+    };
+  }, [flights, bookings, users, payments]);
+
+  const upcomingFlights = useMemo(() => {
+    const now = new Date();
+    return flights
+      .filter((f) => new Date(f.departureTime) > now)
+      .sort((a, b) => new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime())
+      .slice(0, 5);
+  }, [flights]);
+
+  // Sort bookings to show the newest ones first
+  const recentBookings = useMemo(() => {
+    return [...bookings]
+      .sort((a, b) => new Date(b.bookingDate || 0).getTime() - new Date(a.bookingDate || 0).getTime())
+      .slice(0, 5);
+  }, [bookings]);
+
+  if (loading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-slate-300" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -43,7 +101,7 @@ export default function AdminDashboardPage() {
         <StatCard
           label="Total flights"
           value={stats.totalFlights.toLocaleString()}
-          delta="Across 14-day schedule"
+          delta="Scheduled in system"
           icon={CalendarRange}
           accent="aviation"
         />
@@ -57,7 +115,7 @@ export default function AdminDashboardPage() {
         <StatCard
           label="Registered users"
           value={stats.registeredUsers.toLocaleString()}
-          delta={`${MOCK_USERS.filter((u) => u.isActive).length} active`}
+          delta={`${stats.activeUsers} active`}
           icon={Users}
           accent="emerald"
         />
@@ -81,20 +139,24 @@ export default function AdminDashboardPage() {
             </Link>
           </div>
           <div className="divide-y divide-slate-100">
-            {MOCK_BOOKINGS.slice(0, 5).map((b) => (
-              <div key={b.id} className="flex items-center justify-between px-5 py-3.5">
-                <div>
-                  <p className="font-mono-data text-sm font-semibold text-slate-800">{b.bookingCode}</p>
-                  <p className="text-xs text-slate-400">
-                    {b.flight.flightNumber} · {b.bookedBy}
-                  </p>
+            {recentBookings.length === 0 ? (
+               <div className="px-5 py-8 text-center text-sm text-slate-500">No bookings found.</div>
+            ) : (
+              recentBookings.map((b) => (
+                <div key={b.id || b.bookingCode} className="flex items-center justify-between px-5 py-3.5">
+                  <div>
+                    <p className="font-mono-data text-sm font-semibold text-slate-800">{b.bookingCode}</p>
+                    <p className="text-xs text-slate-400">
+                      {b.flight?.flightNumber || "Unknown Flight"} · {b.user?.email || b.user?.username || "Guest"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge tone={paymentStatusTone(b.paymentStatus)}>{b.paymentStatus}</Badge>
+                    <Badge tone={bookingStatusTone(b.status)}>{BOOKING_STATUS_LABELS[b.status] || b.status}</Badge>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge tone={paymentStatusTone(b.paymentStatus)}>{b.paymentStatus}</Badge>
-                  <Badge tone={bookingStatusTone(b.status)}>{BOOKING_STATUS_LABELS[b.status]}</Badge>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -107,23 +169,27 @@ export default function AdminDashboardPage() {
             </Link>
           </div>
           <div className="divide-y divide-slate-100">
-            {upcomingFlights.map((f) => (
-              <div key={f.id} className="flex items-center justify-between px-5 py-3.5">
-                <div>
-                  <p className="font-mono-data text-sm font-semibold text-slate-800">{f.flightNumber}</p>
-                  <p className="text-xs text-slate-400">
-                    {f.departureAirport.iataCode} → {f.destinationAirport.iataCode}
-                  </p>
+            {upcomingFlights.length === 0 ? (
+               <div className="px-5 py-8 text-center text-sm text-slate-500">No upcoming flights scheduled.</div>
+            ) : (
+              upcomingFlights.map((f) => (
+                <div key={f.id || f.flightNumber} className="flex items-center justify-between px-5 py-3.5">
+                  <div>
+                    <p className="font-mono-data text-sm font-semibold text-slate-800">{f.flightNumber}</p>
+                    <p className="text-xs text-slate-400">
+                      {f.departureAirport?.iataCode || "N/A"} → {f.destinationAirport?.iataCode || "N/A"}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-semibold text-slate-600">{formatDate(f.departureTime)}</p>
+                    <p className="flex items-center justify-end gap-1 text-xs text-emerald-600">
+                      <TrendingUp className="h-3 w-3" />
+                      {f.availableSeats ?? "-"} seats left
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs font-semibold text-slate-600">{formatDate(f.departureTime)}</p>
-                  <p className="flex items-center justify-end gap-1 text-xs text-emerald-600">
-                    <TrendingUp className="h-3 w-3" />
-                    {f.availableSeats} seats left
-                  </p>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>

@@ -31,7 +31,7 @@ export function AirlineFormModal({ open, initial, onClose, onSave }: AirlineForm
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<{ code: number; message: string } | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSaving(true);
     setError(null);

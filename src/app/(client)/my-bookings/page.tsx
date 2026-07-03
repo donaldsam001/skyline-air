@@ -23,7 +23,7 @@ const STATUS_TABS = [
 ];
 
 function MyBookingsInner() {
-  const { isAuthenticated, user, hydrateDemoCustomer } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const searchParams = useSearchParams();
   const router = useRouter();
   const confirmedCode = searchParams.get("confirmed");
@@ -35,25 +35,26 @@ function MyBookingsInner() {
   const [cancelBooking, setCancelBooking] = useState<Booking | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated) hydrateDemoCustomer();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
+    if (!isAuthenticated) {
+      router.push("/login?redirect=/my-bookings");
+      return;
+    }
     let active = true;
     Promise.resolve().then(() => {
       if (active) setLoading(true);
     });
-    api.users.getMyBookings(user.email).then((res) => {
+    // GET /users/bookings — JWT identifies the user, no email param needed
+    api.users.getMyBookings().then((res) => {
       if (!active) return;
       setBookings(res);
       setLoading(false);
+    }).catch(() => {
+      if (!active) return;
+      setLoading(false);
     });
-    return () => {
-      active = false;
-    };
-  }, [user]);
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, user]);
 
   const filtered = useMemo(
     () => (tab === "ALL" ? bookings : bookings.filter((b) => b.status === tab)),

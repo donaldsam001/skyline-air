@@ -1,24 +1,40 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pencil, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { Aircraft } from "@/types";
-import { MOCK_AIRCRAFT } from "@/lib/mock/aircraft";
 import { findAirline } from "@/lib/mock/airports-airlines";
 import { AdminToolbar } from "@/components/admin/admin-toolbar";
 import { AircraftFormModal } from "@/components/admin/aircraft-form-modal";
 import { ConfirmDeleteModal } from "@/components/admin/confirm-delete-modal";
 import { CABIN_LABELS } from "@/lib/utils";
-
-let idCounter = 100;
+import { api } from "@/lib/api/client";
 
 export default function AircraftAdminPage() {
-  const [aircraft, setAircraft] = useState<Aircraft[]>(MOCK_AIRCRAFT);
+  const [aircraft, setAircraft] = useState<Aircraft[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Aircraft | null>(null);
   const [deleting, setDeleting] = useState<Aircraft | null>(null);
+
+  // Simulate fetching aircraft from the backend on component mount
+  useEffect(() => {
+    let mounted = true;
+    api.aircraft.getAll()
+      .then((data) => {
+        if (mounted) {
+          setAircraft(data);
+          setLoading(false);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load aircraft:", error);
+        if (mounted) setLoading(false);
+      });
+    return () => { mounted = false; };
+  }, []);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -28,18 +44,22 @@ export default function AircraftAdminPage() {
   }, [aircraft, search]);
 
   async function handleSave(data: Omit<Aircraft, "id">, id?: string) {
-    // Simulated POST /airplane/admin/aircraft/{airlineCode}
-    await new Promise((r) => setTimeout(r, 500));
-    if (!id && aircraft.some((a) => a.tailRegistration === data.tailRegistration)) {
-      return { ok: false, code: 5003, message: "Aircraft tail registration already exists." };
+    try {
+      if (id) {
+        // Update existing aircraft
+        const updated = await api.aircraft.update(id, data);
+        setAircraft((prev) => prev.map((a) => (a.id === id ? updated : a)));
+      } else {
+        // Create new aircraft
+        const created = await api.aircraft.create(data);
+        setAircraft((prev) => [...prev, created]);
+      }
+      return { ok: true };
+    } catch (error: any) {
+      console.error("Failed to save aircraft:", error);
+      // Map your Spring Boot AppExceptions/ErrorCodes to frontend codes here if needed
+      return { ok: false, code: 500, message: error.message || "Failed to save aircraft." };
     }
-    if (id) {
-      setAircraft((prev) => prev.map((a) => (a.id === id ? { ...a, ...data } : a)));
-    } else {
-      idCounter += 1;
-      setAircraft((prev) => [...prev, { ...data, id: `ac-${idCounter}` }]);
-    }
-    return { ok: true };
   }
 
   async function handleDelete() {
