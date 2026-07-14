@@ -61,9 +61,9 @@ export const adminApi = {
     getAll: () => fetchAdminApi<any[]>("/flights"),
     search: (data: any) => fetchAdminApi<any[]>("/flights/search", { method: "POST", body: JSON.stringify(data) }),
     create: (airlineCode: string, aircraftCode: string, departureCode: string, destinationCode: string, data: any) => 
-      fetchAdminApi<any>(`/${airlineCode}/${aircraftCode}/${departureCode}/${destinationCode}/flight`, { method: "POST", body: JSON.stringify(data) }),
+    fetchAdminApi<any>(`/${airlineCode}/${aircraftCode}/${departureCode}/${destinationCode}/flight`, { method: "POST", body: JSON.stringify(data) }),
     update: (code: string, data: any) => 
-      fetchAdminApi<any>(`/flights/${code}`, { method: "PUT", body: JSON.stringify(data) }),
+    fetchAdminApi<any>(`/flights/${code}`, { method: "PUT", body: JSON.stringify(data) }),
   },
 
   // --- BOOKINGS ---

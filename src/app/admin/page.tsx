@@ -5,7 +5,7 @@ import { CalendarRange, Ticket, Users, CreditCard, TrendingUp, ArrowRight, Loade
 import Link from "next/link";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge, bookingStatusTone, paymentStatusTone } from "@/components/ui/badge";
-import { adminApi } from "@/lib/api/admin-client";
+import { adminApi } from "@/lib/api/admin";
 import {
   BOOKING_STATUS_LABELS,
   formatCurrency,

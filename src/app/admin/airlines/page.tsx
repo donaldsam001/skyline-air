@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pencil, Trash2, Mail, Phone, Loader2 } from "lucide-react";
 import { Airline } from "@/types";
-import { adminApi } from "@/lib/api/admin-client";
+import { adminApi } from "@/lib/api/admin";
 import { DataTable, Column } from "@/components/admin/data-table";
 import { AdminToolbar } from "@/components/admin/admin-toolbar";
 import { AirlineFormModal } from "@/components/admin/airline-form-modal";

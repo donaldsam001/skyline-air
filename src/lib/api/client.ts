@@ -83,7 +83,9 @@ export const api = {
     },
 
     async getMyInfo(): Promise<User> {
+      console.log(BASE_URL);
       const response = await fetch(`${BASE_URL}/users`, {
+        method: "GET",
         headers: getAuthHeaders(),
       });
       
@@ -177,7 +179,7 @@ export const api = {
   },
 
   // ----------------------------------------------------
-  // Airlines (Admin)
+  // Airlines 
   // ----------------------------------------------------
   airlines: {
     async getAll(): Promise<Airline[]> {
@@ -187,36 +189,11 @@ export const api = {
       if (!response.ok) throw new ApiError({ code: response.status, message: "Failed to fetch airlines" });
       const data = await response.json();
       return data.result; 
-    },
-
-    async create(data: Omit<Airline, "id">): Promise<Airline> {
-      const response = await fetch(`${BASE_URL}/admin/airline`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new ApiError({ code: response.status, message: errorData.message || "Failed to create airline" });
-      }
-      const resData = await response.json();
-      return resData.result;
-    },
-
-    async update(code: string, data: Partial<Airline>): Promise<Airline> {
-      const response = await fetch(`${BASE_URL}/admin/airline/${code}`, {
-        method: "PUT",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new ApiError({ code: response.status, message: "Failed to update airline" });
-      const resData = await response.json();
-      return resData.result;
     }
   },
 
   // ----------------------------------------------------
-  // Aircraft (Admin)
+  // Aircraft 
   // ----------------------------------------------------
   aircraft: {
     async getAll(): Promise<Aircraft[]> {
@@ -226,38 +203,11 @@ export const api = {
       if (!response.ok) throw new ApiError({ code: response.status, message: "Failed to fetch aircraft" });
       const data = await response.json();
       return data.result; 
-    },
-
-    // Backend requires `airlineCode` in path variable to create an Aircraft
-    async create(airlineCode: string, data: Omit<Aircraft, "id">): Promise<Aircraft> {
-      const response = await fetch(`${BASE_URL}/admin/aircraft/${airlineCode}`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new ApiError({ code: response.status, message: errorData.message || "Failed to create aircraft" });
-      }
-      const resData = await response.json();
-      return resData.result;
-    },
-
-    // Identifies aircraft by its unique registration code
-    async update(code: string, data: Partial<Aircraft>): Promise<Aircraft> {
-      const response = await fetch(`${BASE_URL}/admin/aircraft/${code}`, {
-        method: "PUT",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new ApiError({ code: response.status, message: "Failed to update aircraft" });
-      const resData = await response.json();
-      return resData.result;
     }
   },
 
   // ----------------------------------------------------
-  // Airports (Admin)
+  // Airports 
   // ----------------------------------------------------
   airports: {
     async getAll(): Promise<Airport[]> {
@@ -267,31 +217,6 @@ export const api = {
       if (!response.ok) throw new ApiError({ code: response.status, message: "Failed to fetch airports" });
       const data = await response.json();
       return data.result; 
-    },
-
-    async create(data: Omit<Airport, "id">): Promise<Airport> {
-      const response = await fetch(`${BASE_URL}/admin/airport`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new ApiError({ code: response.status, message: errorData.message || "Failed to create airport" });
-      }
-      const resData = await response.json();
-      return resData.result;
-    },
-
-    async update(code: string, data: Partial<Airport>): Promise<Airport> {
-      const response = await fetch(`${BASE_URL}/admin/airport/${code}`, {
-        method: "PUT",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new ApiError({ code: response.status, message: "Failed to update airport" });
-      const resData = await response.json();
-      return resData.result;
     }
   }
 };
