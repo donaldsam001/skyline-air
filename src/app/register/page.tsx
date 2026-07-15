@@ -4,12 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Mail, Lock, User as UserIcon, Phone, Plane, Check, X } from "lucide-react";
-import { findUserByEmail } from "@/lib/mock/users";
 import { resolveErrorCode } from "@/lib/error-codes";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { AlertBanner } from "@/components/ui/alert-banner";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api/client"; // Imported the core api client
+import { ApiError } from "@/types";
 
 const PASSWORD_RULES = [
   { test: (v: string) => v.length >= 8, label: "At least 8 characters" },
@@ -23,7 +24,6 @@ export default function RegisterPage() {
   const router = useRouter();
   const [form, setForm] = useState({
     email: "",
-    username: "",
     firstName: "",
     lastName: "",
     phone: "",
@@ -42,29 +42,48 @@ export default function RegisterPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setApiError(null);
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 600));
-    setLoading(false);
 
-    // Simulated POST /airplane/users validation, mirroring backend ErrorCode responses.
-    if (findUserByEmail(form.email)) {
-      const entry = resolveErrorCode(1002);
-      setApiError({ code: 1002, message: entry.message });
-      return;
-    }
-    if (form.username.length < 4) {
-      const entry = resolveErrorCode(1003);
-      setApiError({ code: 1003, message: entry.message });
-      return;
-    }
     if (!passwordValid) {
       const entry = resolveErrorCode(1045);
       setApiError({ code: 1045, message: entry.message });
       return;
     }
 
-    setSuccess(true);
-    setTimeout(() => router.push("/login"), 1400);
+    setLoading(true);
+    
+    console.log("Submitting registration form:", form); // Debugging log
+
+    try {
+      // 2. Call backend register API
+      await api.users.register({
+        email: form.email,
+        passwordHash: form.password,
+        firstName: form.firstName,
+        lastName: form.lastName,
+        phone: form.phone,
+      });
+
+      setSuccess(true);
+      setTimeout(() => router.push("/login"), 1400);
+    } catch (error: any) {
+      // 3. Robust Error Handling
+      if (error instanceof ApiError) {
+        // Try parsing error code dynamically if your ApiError returns it, otherwise fall back
+        const errorCode = error.code || 1000; 
+        const entry = resolveErrorCode(errorCode);
+        setApiError({ 
+          code: errorCode, 
+          message: entry?.message || error.message || "Registration failed. Please try again." 
+        });
+      } else {
+        setApiError({ 
+          code: 500, 
+          message: error.message || "An unexpected error occurred." 
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -108,17 +127,6 @@ export default function RegisterPage() {
               icon={<Mail className="h-4 w-4" />}
               value={form.email}
               onChange={(e) => update("email", e.target.value)}
-              required
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="username">Username</Label>
-            <Input
-              id="username"
-              icon={<UserIcon className="h-4 w-4" />}
-              value={form.username}
-              onChange={(e) => update("username", e.target.value)}
               required
             />
           </div>
