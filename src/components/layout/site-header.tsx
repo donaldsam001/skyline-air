@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Plane, Menu, X, User as UserIcon, LogOut, LayoutDashboard } from "lucide-react";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { Button } from "@/components/ui/button";
+import { User } from "@/types";
+import { api } from "@/lib/api/client";
 
 const NAV_LINKS = [
   { href: "/", label: "Book a flight" },
@@ -16,8 +18,28 @@ const NAV_LINKS = [
 export function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const { isAuthenticated, isAdmin, user, logout } = useAuthStore();
+  const { isAuthenticated, isAdmin, logout } = useAuthStore();
+  
+  const [user, setUser] = useState<User | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // 1. Fetch user profile when authenticated
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        const data = await api.users.getMyInfo();
+        setUser(data);
+      } catch (err) {
+        console.error("Failed to fetch user profile info:", err);
+      }
+    }
+
+    if (isAuthenticated) {
+      loadProfile();
+    } else {
+      setUser(null); // Clear local profile state on logout
+    }
+  }, [isAuthenticated]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
@@ -57,10 +79,14 @@ export function SiteHeader() {
                 </Link>
               )}
               <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-1.5">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-aviation-900/10 text-aviation-900">
-                  <UserIcon className="h-3.5 w-3.5" />
-                </span>
-                <span className="text-sm font-semibold text-slate-700">{user?.firstName}</span>
+
+                <Link href="/my-profile" className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-aviation-900/10 text-aviation-900">
+                      <UserIcon className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="text-sm font-semibold text-slate-700">{user?.firstName} {user?.lastName}</span>
+                </Link>
+
               </div>
               <button
                 onClick={() => {

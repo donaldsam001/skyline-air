@@ -1,68 +1,70 @@
 // ─── Domain Entities (mirrors /airplane API contract) ─────────────────────
 
-export type Permission = string;
+export type CabinTier = "ECONOMY" | "PREMIUM_ECONOMY" | "BUSINESS" | "FIRST";
+export type PassengerType = "ADULT" | "CHILD" | "INFANT";
+export type BookingStatus = "CREATED" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+export type PaymentStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED";
+export type PaymentMethod = "CREDIT_CARD" | "DIGITAL_WALLET";
+export type FlightStatus = "SCHEDULED" | "BOARDING" | "DEPARTED" | "IN_FLIGHT" | "DELAYED" | "ARRIVED" | "CANCELLED";
+export type SeatType = "ECONOMY" | "PREMIUM_ECONOMY" | "BUSINESS" | "FIRST_CLASS";
+export type TicketStatus = "ISSUED" | "CANCELLED" | "REFUNDED" | "USED";
+
+export interface Permission {
+  name: string;
+  description: string;
+}
 
 export interface Role {
   name: "ADMIN" | "CUSTOMER" | "STAFF" | string;
   description: string;
-  permissions: Permission[];
+  permissions?: Permission[];
 }
+
+
 
 export interface User {
-  id: string;
+  id?: number;
   email: string;
-  username: string;
-  firstName: string;
-  lastName: string;
-  phone: string;
-  isActive: boolean;
-  roles: Role[];
-  createdAt: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  isActive?: boolean;
+  registeredAt?: string; // ISO-8601 DateTime string
+  roles?: Role[];
 }
 
-export type CabinTier = "ECONOMY" | "PREMIUM_ECONOMY" | "BUSINESS" | "FIRST";
+export interface Airport {
+  id?: number;
+  code: string;
+  name: string;
+  city?: string;
+  country?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+export interface Airline {
+  id?: number;
+  name: string;
+  code: string;
+  contactEmail?: string;
+  contactPhone?: string;
+}
+
+export interface Aircraft {
+  id?: number;
+  model: string;
+  registrationNumber: string;
+  totalSeats: number;
+  seatConfiguration?: string; // JSON string
+  airline?: Airline;
+}
 
 export interface SeatConfigSegment {
   cabin: CabinTier;
   seats: number;
   basePriceMultiplier: number;
 }
-
-export interface Airport {
-  id: string;
-  iataCode: string;
-  name: string;
-  city: string;
-  country: string;
-  latitude: number;
-  longitude: number;
-}
-
-export interface Airline {
-  id: string;
-  iataCarrierCode: string;
-  operatorName: string;
-  email: string;
-  phone: string;
-  logoColor?: string;
-}
-
-export interface Aircraft {
-  id: string;
-  model: string;
-  tailRegistration: string;
-  airlineCode: string;
-  seatCapacity: number;
-  seatConfig: SeatConfigSegment[];
-}
-
-export type FlightStatus =
-  | "SCHEDULED"
-  | "BOARDING"
-  | "DEPARTED"
-  | "DELAYED"
-  | "CANCELLED"
-  | "COMPLETED";
 
 export interface FareRule {
   cabin: CabinTier;
@@ -72,69 +74,65 @@ export interface FareRule {
 }
 
 export interface Flight {
-  id: string;
+  id?: number;
   flightNumber: string;
   departureAirport: Airport;
   destinationAirport: Airport;
-  departureTime: string; // ISO
-  arrivalTime: string; // ISO
-  airline: Airline;
-  aircraft: Aircraft;
-  totalSeats: number;
-  availableSeats: number;
-  fareRules: FareRule[];
+  departureTime: string; // ISO-8601 DateTime string
+  arrivalTime: string; // ISO-8601 DateTime string
+  airline?: Airline;
+  aircraft?: Aircraft;
+  totalSeats?: number;
+  availableSeats?: number;
+  fareRules?: string; // JSON string
   flightStatus: FlightStatus;
 }
 
-export type PassengerType = "ADULT" | "CHILD" | "INFANT";
 
 export interface Passenger {
-  id?: string;
+  id?: number;
   firstName: string;
   lastName: string;
   passengerType: PassengerType;
-  dateOfBirth: string; // YYYY-MM-DD
+  dateOfBirth: string; // YYYY-MM-DD format
   passportNumber: string;
   nationality: string;
 }
 
-export type BookingStatus = "CREATED" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
-export type PaymentStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED";
-
-export type PaymentMethod = "CREDIT_CARD" | "DIGITAL_WALLET";
 
 export interface Payment {
-  id: string;
+  id?: number;
   transactionRef: string;
   amount: number;
   paymentMethod: PaymentMethod;
   status: PaymentStatus;
-  paidAt: string | null;
+  paidAt?: string; // ISO-8601 DateTime string
   gatewayResponse?: string;
 }
 
 export interface Ticket {
-  id: string;
   ticketNumber: string;
-  passengerName: string;
-  seatNumber: string;
-  cabin: CabinTier;
-  issuedAt: string;
+  seatType: SeatType;
+  seatNumber?: string;
+  price: number;
+  status: TicketStatus;
+  issuedAt: string; // ISO-8601 DateTime string
 }
 
 export interface Booking {
-  id: string;
+  id?: number;
   bookingCode: string;
   flight: Flight;
-  bookedBy: string; // user email
-  createdAt: string;
+  user?: User;
+  seatType: SeatType;
+  totalPrice: number;
   status: BookingStatus;
   paymentStatus: PaymentStatus;
-  totalPrice: number;
-  seatType: CabinTier;
-  passengers: Passenger[];
-  tickets: Ticket[];
-  payments: Payment[];
+  notes?: string;
+  createdAt: string; // ISO-8601 DateTime string
+  passengers?: Passenger[];
+  payments?: Payment[];
+  tickets?: Ticket[];
 }
 
 // ─── API Error Contract ────────────────────────────────────────────────────
@@ -174,15 +172,74 @@ export interface RegisterPayload {
 
 // ─── Search / Booking flow ─────────────────────────────────────────────────
 
-export interface FlightSearchParams {
-  from: string;
-  to: string;
-  startDate: string;
-  endDate?: string;
-  passengers?: number;
-  cabin?: CabinTier;
-}
+// export interface FlightSearchParams {
+//   from: string;
+//   to: string;
+//   startDate: string;
+//   endDate?: string;
+//   passengers?: number;
+//   cabin?: CabinTier;
+// }
 
 export interface DraftPassenger extends Passenger {
   uid: string;
+}
+
+// ==========================================
+// 3. REQUEST DTOs
+// ==========================================
+
+export interface UserRegistrationRequest {
+  email: string;
+  passwordHash: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+}
+
+export interface UserUpdateRequest {
+  passwordHash?: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+}
+
+export interface PassengerRequest {
+  firstName: string;
+  lastName: string;
+  passengerType: PassengerType;
+  dateOfBirth: string; // YYYY-MM-DD
+  passportNumber: string;
+  nationality: string;
+}
+
+export interface CreateBookingRequest {
+  user: Partial<User>; // Spring expects a User object, usually just `{ email: "..." }` is enough
+  seatType: SeatType;
+  passengers: PassengerRequest[];
+  notes?: string;
+}
+
+export interface UpdateBookingRequest {
+  status: BookingStatus;
+  passengers: PassengerRequest[];
+  notes?: string;
+}
+
+export interface CancelRequest {
+  reason?: string;
+}
+
+// NOTE: Even though this says "Response" in Java, it is used as a Request body in the callback controller
+export interface PaymentGatewayResponse {
+  paymentMethod: PaymentMethod;
+  status: PaymentStatus;
+  gatewayResponse?: string;
+}
+
+export interface FlightSearchParams {
+  from: string;
+  to: string;
+  startDate?: string; // ISO-8601 DateTime string
+  endDate?: string; // ISO-8601 DateTime string
 }

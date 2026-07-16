@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
-import { CabinTier, Flight, PaymentMethod } from "@/types";
+import { ChevronLeft, ChevronRight, Loader2, User } from "lucide-react";
+import { SeatType, Flight, PaymentMethod } from "@/types";
 import { api } from "@/lib/api/client";
 import { useBookingDraft } from "@/lib/store/booking-draft-store";
 import { useAuthStore } from "@/lib/store/auth-store";
@@ -14,7 +14,7 @@ import { PassengerDetailsStep } from "@/components/booking/passenger-details-ste
 import { SummaryStep, computeTotal } from "@/components/booking/summary-step";
 import { Button } from "@/components/ui/button";
 import { AlertBanner } from "@/components/ui/alert-banner";
-import { genBookingCode } from "@/lib/utils";
+import { cabinToSeatType } from "@/lib/utils";
 
 export default function BookingWizardPage() {
   const params = useParams<{ flightId: string }>();
@@ -31,7 +31,7 @@ export default function BookingWizardPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.flights.get(params.flightId).then((f) => {
+    api.flights.get(decodeURIComponent(params.flightId)).then((f) => {
       setFlight(f);
       draft.setFlight(f);
       setLoading(false);
@@ -76,15 +76,27 @@ export default function BookingWizardPage() {
       router.push("/login?redirect=" + encodeURIComponent(`/booking/${params.flightId}`));
       return;
     }
+
+    if (!flight || !draft.seatType) return;
     setSubmitting(true);
     setSubmitError(null);
-    // Simulated POST /airplane/users/{flightNumber}/booking
-    await new Promise((r) => setTimeout(r, 1200));
-    const bookingCode = genBookingCode();
-    setSubmitting(false);
-    draft.reset();
-    router.push(`/my-bookings?confirmed=${bookingCode}`);
+    try{
+      const backendSeatType = cabinToSeatType(draft.seatType) as SeatType;
+      const booking = await api.users.createBooking(flight.flightNumber, {
+        user: { email: User.email },
+        seatType: backendSeatType,
+        passengers: draft.passengers.map(({uid: _uid, ...p}) => p),
+        note: "",
+      });
+      draft.reset();
+      router.push(`/my-bookings?confirmed=${booking.bookingCode}`);
+    } catch (err: any) {
+      const message = err?.response?.data?.message ?? "An unexpected error occurred. Please try again.";
+      setSubmitError(message);
+      setSubmitting(false);
+    }
   }
+  
 
   if (loading) {
     return (
