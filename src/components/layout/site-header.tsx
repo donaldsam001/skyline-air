@@ -79,10 +79,14 @@ export function SiteHeader() {
                 </Link>
               )}
               <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-1.5">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-aviation-900/10 text-aviation-900">
-                  <UserIcon className="h-3.5 w-3.5" />
-                </span>
-                <span className="text-sm font-semibold text-slate-700">{user?.firstName} {user?.lastName}</span>
+
+                <Link href="/my-profile" className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-aviation-900/10 text-aviation-900">
+                      <UserIcon className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="text-sm font-semibold text-slate-700">{user?.firstName} {user?.lastName}</span>
+                </Link>
+
               </div>
               <button
                 onClick={() => {
