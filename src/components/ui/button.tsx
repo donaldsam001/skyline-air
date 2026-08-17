@@ -2,7 +2,7 @@ import { ButtonHTMLAttributes, forwardRef } from "react";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Variant = "primary" | "secondary" | "ghost" | "outline" | "danger" | "subtle";
+type Variant = "primary" | "secondary" | "ghost" | "outline" | "danger" | "subtle" | "cta";
 type Size = "sm" | "md" | "lg";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -22,6 +22,7 @@ const variantClasses: Record<Variant, string> = {
   ghost: "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
   subtle: "bg-sky-100 text-aviation-900 hover:bg-sky-100/70",
   danger: "bg-red-600 text-white hover:bg-red-700 shadow-sm shadow-red-600/20",
+  cta: "bg-amber-500 text-aviation-950 hover:bg-amber-400 active:bg-amber-500 shadow-md shadow-amber-500/25 hover:shadow-lg hover:shadow-amber-500/30 hover:-translate-y-0.5 active:translate-y-0",
 };
 
 const sizeClasses: Record<Size, string> = {
@@ -40,8 +41,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || loading}
         className={cn(
-          "inline-flex items-center justify-center font-semibold transition-colors duration-150",
-          "disabled:opacity-50 disabled:cursor-not-allowed",
+          "inline-flex items-center justify-center font-semibold transition-all duration-150",
+          "disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none",
           variantClasses[variant],
           sizeClasses[size],
           fullWidth && "w-full",

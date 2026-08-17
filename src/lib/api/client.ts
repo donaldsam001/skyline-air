@@ -1,222 +1,175 @@
-import { ApiError, Booking, Flight, FlightSearchParams, User, Airline, Aircraft, Airport,
-  UserRegistrationRequest, UserUpdateRequest, CreateBookingRequest, UpdateBookingRequest,
-  CancelRequest, PaymentGatewayResponse, Payment, AuthTokenResponse } from "@/types";
-import { useAuthStore } from "@/lib/store/auth-store";
+import axiosInstance from "./axios";
+import {
+  AuthTokenResponse,
+  Booking,
+  Flight,
+  FlightSearchParams,
+  User,
+  Airline,
+  Aircraft,
+  Airport,
+  UserRegistrationRequest,
+  UserUpdateRequest,
+  CreateBookingRequest,
+  UpdateBookingRequest,
+  CancelRequest,
+  PaymentGatewayResponse,
+  Payment,
+  PaymentRequest,
+} from "@/types";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/airplane";
-
-// Injects the JWT for endpoints secured by SecurityConfig.java
-const getAuthHeaders = () => {
-  const token = useAuthStore.getState().token;
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-};
-
+/**
+ * Client-facing API — maps to Spring Boot UserController, FlightController,
+ * AuthenticationController, and public lookup endpoints.
+ *
+ * Every method returns the **unwrapped** result because the Axios
+ * response interceptor in `./axios.ts` strips the APIResponse wrapper.
+ */
 export const api = {
   // ----------------------------------------------------
   // Authentication
   // ----------------------------------------------------
   auth: {
+    /** POST /auth/token — returns {token, authenticated} */
     async login(credentials: { email: string; password: string }): Promise<AuthTokenResponse> {
-      const response = await fetch(`${BASE_URL}/auth/token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(credentials),
-      });
-      if (!response.ok) throw new ApiError({ code: response.status, message: "Login failed" });
-      const data = await response.json();
-      return data.result;
+      const { data } = await axiosInstance.post<AuthTokenResponse>("/auth/token", credentials);
+      return data;
     },
+
+    /** POST /auth/logout */
     async logout(token: string): Promise<void> {
-      const response = await fetch(`${BASE_URL}/auth/logout`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ token }),
-      });
-      if (!response.ok) throw new ApiError({ code: response.status, message: "Logout failed" });
-    }
+      await axiosInstance.post("/auth/logout", { token });
+    },
   },
 
   // ----------------------------------------------------
-  // Flights (Admin/Public)
+  // Flights (Search & Detail)"/flights/search/round-trip")
   // ----------------------------------------------------
   flights: {
-    async search(params: FlightSearchParams): Promise<Flight[]> {
-      const response = await fetch(`${BASE_URL}/admin/flights/search`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(params),
-      });
-      
-      if (!response.ok) throw new ApiError({ code: response.status, message: "Search failed" });
-      const data = await response.json();
-      return data.result; 
+    async searchRoundTrip(params: FlightSearchParams): Promise<Flight[]> {
+      const { data } = await axiosInstance.post<Flight[]>("/admin/flights/search/round-trip", params);
+      return data;
     },
-    
+
+    /** POST /admin/flights/search — search by route & dates */
+    async search(params: FlightSearchParams): Promise<Flight[]> {
+      const { data } = await axiosInstance.post<Flight[]>("/admin/flights/search", params);
+      return data;
+    },
+
+    /** GET /admin/flights — all flights */
     async getAll(): Promise<Flight[]> {
-      const response = await fetch(`${BASE_URL}/admin/flights`, {
-        headers: getAuthHeaders(),
-      });
-      
-      if (!response.ok) throw new ApiError({ code: response.status, message: "Failed to fetch flights" });
-      const data = await response.json();
-      return data.result;
+      const { data } = await axiosInstance.get<Flight[]>("/admin/flights");
+      return data;
+    },
+
+    /** GET /admin/flights/{flightNumber} — single flight detail */
+    async get(flightNumber: string): Promise<Flight> {
+      const { data } = await axiosInstance.get<Flight>(`/admin/flights/${flightNumber}`);
+      return data;
     },
   },
 
   // ----------------------------------------------------
-  // Users Profile, Bookings & Payments
+  // Users: Profile, Bookings & Payments
   // ----------------------------------------------------
   users: {
-    async register(data: UserRegistrationRequest): Promise<User> {
-      const response = await fetch(`${BASE_URL}/users`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }, 
-        body: JSON.stringify(data),
-      });
-      
-      if (!response.ok) throw new ApiError({ code: response.status, message: "Registration failed" });
-      const resData = await response.json();
-      return resData.result;
+    /** POST /users — register new user */
+    async register(payload: UserRegistrationRequest): Promise<User> {
+      const { data } = await axiosInstance.post<User>("/users", payload);
+      return data;
     },
 
+    /** GET /users — get current user's profile (JWT-based) */
     async getMyInfo(): Promise<User> {
-      console.log(BASE_URL);
-      const response = await fetch(`${BASE_URL}/users`, {
-        method: "GET",
-        headers: getAuthHeaders(),
-      });
-      
-      if (!response.ok) throw new ApiError({ code: response.status, message: "Profile access denied" });
-      const data = await response.json();
-      return data.result;
+      const { data } = await axiosInstance.get<User>("/users");
+      return data;
     },
 
-    async updateUser(email: string, data: UserUpdateRequest): Promise<User> {
-      const response = await fetch(`${BASE_URL}/users/update/${email}`, {
-        method: "PUT",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data),
-      });
-      
-      if (!response.ok) throw new ApiError({ code: response.status, message: "Failed to update user" });
-      
-      const resData = await response.json();
-      // updateUser in Java controller returns UserResponse directly (not wrapped in APIResponse)
-      return resData; 
+    /** PUT /users/update/{email} */
+    async updateUser(email: string, payload: UserUpdateRequest): Promise<User> {
+      const { data } = await axiosInstance.put<User>(`/users/update/${email}`, payload);
+      return data;
     },
 
+    /** GET /users/bookings — current user's bookings */
     async getMyBookings(): Promise<Booking[]> {
-      const response = await fetch(`${BASE_URL}/users/bookings`, {
-        headers: getAuthHeaders(),
-      });
-      
-      if (!response.ok) throw new ApiError({ code: response.status, message: "Failed to load bookings" });
-      const data = await response.json();
-      return data.result;
+      const { data } = await axiosInstance.get<Booking[]>("/users/bookings");
+      return data;
     },
 
-    async createBooking(flightNumber: string, data: CreateBookingRequest): Promise<Booking> {
-      const response = await fetch(`${BASE_URL}/users/${flightNumber}/booking`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data),
-      });
-      
-      if (!response.ok) throw new ApiError({ code: response.status, message: "Failed to create booking" });
-      const resData = await response.json();
-      return resData.result;
+    /** POST /users/{flightNumber}/booking — create booking */
+    async createBooking(flightNumber: string, payload: CreateBookingRequest): Promise<Booking> {
+      const { data } = await axiosInstance.post<Booking>(
+        `/users/${flightNumber}/booking`,
+        payload
+      );
+      return data;
     },
 
-    async updateBooking(code: string, data: UpdateBookingRequest): Promise<Booking> {
-      const response = await fetch(`${BASE_URL}/users/booking/${code}`, {
-        method: "PUT",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data),
-      });
-      
-      if (!response.ok) throw new ApiError({ code: response.status, message: "Failed to update booking" });
-      const resData = await response.json();
-      return resData.result;
+    /** PUT /users/booking/{bookingCode} — update booking */
+    async updateBooking(code: string, payload: UpdateBookingRequest): Promise<Booking> {
+      const { data } = await axiosInstance.put<Booking>(`/users/booking/${code}`, payload);
+      return data;
     },
 
-    async cancelBooking(bookingCode: string, data: CancelRequest): Promise<Booking> {
-      const response = await fetch(`${BASE_URL}/users/booking/${bookingCode}/cancel`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data),
-      });
-      
-      if (!response.ok) throw new ApiError({ code: response.status, message: "Failed to cancel booking" });
-      const resData = await response.json();
-      return resData.result;
+    /** POST /users/booking/{bookingCode}/cancel */
+    async cancelBooking(bookingCode: string, payload: CancelRequest): Promise<Booking> {
+      const { data } = await axiosInstance.post<Booking>(
+        `/users/booking/${bookingCode}/cancel`,
+        payload
+      );
+      return data;
     },
 
-    async handlePaymentCallback(transactionRef: string, data: PaymentGatewayResponse): Promise<Payment> {
-      const response = await fetch(`${BASE_URL}/users/payment/callback/${transactionRef}`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data),
-      });
-      
-      if (!response.ok) throw new ApiError({ code: response.status, message: "Payment callback failed" });
-      const resData = await response.json();
-      return resData.result;
+    /** POST /users/payment/callback/{transactionRef} — simulate payment callback */
+    async handlePaymentCallback(
+      transactionRef: string,
+      payload: PaymentGatewayResponse
+    ): Promise<Payment> {
+      const { data } = await axiosInstance.post<Payment>(
+        `/users/payment/callback/${transactionRef}`,
+        payload
+      );
+      return data;
     },
 
+    /** POST /users/payment/refund/{transactionRef} */
     async refundPayment(transactionRef: string): Promise<Payment> {
-      const response = await fetch(`${BASE_URL}/users/payment/refund/${transactionRef}`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-      });
-      
-      if (!response.ok) throw new ApiError({ code: response.status, message: "Refund failed" });
-      const resData = await response.json();
-      return resData.result;
-    }
+      const { data } = await axiosInstance.post<Payment>(
+        `/users/payment/refund/${transactionRef}`
+      );
+      return data;
+    },
   },
 
   // ----------------------------------------------------
-  // Airlines 
+  // Airlines (public lookup)
   // ----------------------------------------------------
   airlines: {
     async getAll(): Promise<Airline[]> {
-      const response = await fetch(`${BASE_URL}/admin/airlines`, { 
-        headers: getAuthHeaders(),
-      });
-      if (!response.ok) throw new ApiError({ code: response.status, message: "Failed to fetch airlines" });
-      const data = await response.json();
-      return data.result; 
-    }
+      const { data } = await axiosInstance.get<Airline[]>("/admin/airlines");
+      return data;
+    },
   },
 
   // ----------------------------------------------------
-  // Aircraft 
+  // Aircraft (public lookup)
   // ----------------------------------------------------
   aircraft: {
     async getAll(): Promise<Aircraft[]> {
-      const response = await fetch(`${BASE_URL}/admin/aircraft`, {
-        headers: getAuthHeaders(),
-      });
-      if (!response.ok) throw new ApiError({ code: response.status, message: "Failed to fetch aircraft" });
-      const data = await response.json();
-      return data.result; 
-    }
+      const { data } = await axiosInstance.get<Aircraft[]>("/admin/aircraft");
+      return data;
+    },
   },
 
   // ----------------------------------------------------
-  // Airports 
+  // Airports (public lookup)
   // ----------------------------------------------------
   airports: {
     async getAll(): Promise<Airport[]> {
-      const response = await fetch(`${BASE_URL}/admin/airports`, { 
-        headers: getAuthHeaders(),
-      });
-      if (!response.ok) throw new ApiError({ code: response.status, message: "Failed to fetch airports" });
-      const data = await response.json();
-      return data.result; 
-    }
-  }
+      const { data } = await axiosInstance.get<Airport[]>("/admin/airports");
+      return data;
+    },
+  },
 };

@@ -2,9 +2,9 @@
 
 export type CabinTier = "ECONOMY" | "PREMIUM_ECONOMY" | "BUSINESS" | "FIRST";
 export type PassengerType = "ADULT" | "CHILD" | "INFANT";
-export type BookingStatus = "CREATED" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+export type BookingStatus = "PENDING" | "CREATED" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
 export type PaymentStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED";
-export type PaymentMethod = "CREDIT_CARD" | "DIGITAL_WALLET";
+export type PaymentMethod = "CREDIT_CARD" | "BANK_TRANSFER" | "E_WALLET" | "CASH";
 export type FlightStatus = "SCHEDULED" | "BOARDING" | "DEPARTED" | "IN_FLIGHT" | "DELAYED" | "ARRIVED" | "CANCELLED";
 export type SeatType = "ECONOMY" | "PREMIUM_ECONOMY" | "BUSINESS" | "FIRST_CLASS";
 export type TicketStatus = "ISSUED" | "CANCELLED" | "REFUNDED" | "USED";
@@ -28,6 +28,11 @@ export interface User {
   firstName?: string;
   lastName?: string;
   phone?: string;
+  dob?: string; // YYYY-MM-DD format
+  nationality?: string;
+  passportNumber?: string;
+  address?: string;
+  gender?: "MALE" | "FEMALE";
   isActive?: boolean;
   registeredAt?: string; // ISO-8601 DateTime string
   roles?: Role[];
@@ -135,6 +140,14 @@ export interface Booking {
   tickets?: Ticket[];
 }
 
+// ─── API Response Wrapper (mirrors Spring Boot APIResponse<T>) ─────────────
+
+export interface APIResponse<T> {
+  code: number;
+  message: string;
+  result: T;
+}
+
 // ─── API Error Contract ────────────────────────────────────────────────────
 
 export interface ApiErrorBody {
@@ -171,15 +184,6 @@ export interface RegisterPayload {
 }
 
 // ─── Search / Booking flow ─────────────────────────────────────────────────
-
-// export interface FlightSearchParams {
-//   from: string;
-//   to: string;
-//   startDate: string;
-//   endDate?: string;
-//   passengers?: number;
-//   cabin?: CabinTier;
-// }
 
 export interface DraftPassenger extends Passenger {
   uid: string;
@@ -242,4 +246,10 @@ export interface FlightSearchParams {
   to: string;
   startDate?: string; // ISO-8601 DateTime string
   endDate?: string; // ISO-8601 DateTime string
+}
+
+export interface PaymentRequest {
+  bookingId: number;
+  paymentMethod: PaymentMethod;
+  amount: number;
 }
