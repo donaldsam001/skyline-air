@@ -6,8 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { Plane, Menu, X, LayoutDashboard } from "lucide-react";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { Button } from "@/components/ui/button";
-import { User } from "@/types";
-import { api } from "@/lib/api/client";
 import { UserMenuPopover } from "@/components/client/user-menu-popover";
 
 const NAV_LINKS = [
@@ -19,28 +17,14 @@ const NAV_LINKS = [
 export function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const { isAuthenticated, isAdmin, logout } = useAuthStore();
-
-  const [user, setUser] = useState<User | null>(null);
+  const { isAuthenticated, user, isAdmin, logout, fetchProfile } = useAuthStore();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // 1. Fetch user profile when authenticated
   useEffect(() => {
-    async function loadProfile() {
-      try {
-        const data = await api.users.getMyInfo();
-        setUser(data);
-      } catch (err) {
-        console.error("Failed to fetch user profile info:", err);
-      }
+    if (isAuthenticated && !user) {
+      fetchProfile();
     }
-
-    if (isAuthenticated) {
-      loadProfile();
-    } else {
-      setUser(null); // Clear local profile state on logout
-    }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user, fetchProfile]);
 
   const handleLogout = () => {
     logout();
@@ -96,7 +80,7 @@ export function SiteHeader() {
             <>
               {isAdmin && (
                 <Link href="/admin">
-                  <Button variant={isDarkPage ? "outline" : "outline"} size="sm">
+                  <Button variant="outline" size="sm">
                     <LayoutDashboard className="h-4 w-4" />
                     Admin panel
                   </Button>
@@ -110,7 +94,7 @@ export function SiteHeader() {
             <>
               <Link href="/login">
                 <Button
-                  variant={isDarkPage ? "ghost" : "ghost"}
+                  variant="ghost"
                   size="sm"
                   className={isDarkPage ? "text-white/80 hover:text-white hover:bg-white/10" : ""}
                 >

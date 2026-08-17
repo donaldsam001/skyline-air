@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { Aircraft, CabinTier, SeatConfigSegment } from "@/types";
-import { MOCK_AIRLINES } from "@/lib/mock/airports-airlines";
+import { Aircraft, Airline, CabinTier, SeatConfigSegment } from "@/types";
+import { adminApi } from "@/lib/api/admin";
 import { Modal } from "@/components/ui/modal";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,26 +18,38 @@ interface AircraftFormModalProps {
 }
 
 const EMPTY_SEGMENT: SeatConfigSegment = { cabin: "ECONOMY", seats: 0, basePriceMultiplier: 1 };
-const EMPTY = {
-  model: "",
-  tailRegistration: "",
-  airlineCode: MOCK_AIRLINES[0]?.iataCarrierCode ?? "",
-  seatConfig: [EMPTY_SEGMENT] as SeatConfigSegment[],
-};
 
 export function AircraftFormModal({ open, initial, onClose, onSave }: AircraftFormModalProps) {
+  const [airlines, setAirlines] = useState<Airline[]>([]);
   const [form, setForm] = useState(() =>
     initial
       ? {
           model: initial.model,
           tailRegistration: initial.tailRegistration,
           airlineCode: initial.airlineCode,
-          seatConfig: initial.seatConfig,
+          seatConfig: initial.seatConfig || [EMPTY_SEGMENT],
         }
-      : EMPTY
+      : {
+          model: "",
+          tailRegistration: "",
+          airlineCode: "",
+          seatConfig: [EMPTY_SEGMENT] as SeatConfigSegment[],
+        }
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<{ code: number; message: string } | null>(null);
+
+  useEffect(() => {
+    adminApi.airlines
+      .getAll()
+      .then((data) => {
+        setAirlines(data || []);
+        if (!initial && data && data.length > 0) {
+          setForm((f) => ({ ...f, airlineCode: data[0].code }));
+        }
+      })
+      .catch(() => {});
+  }, [initial]);
 
   const totalSeats = form.seatConfig.reduce((sum, s) => sum + (s.seats || 0), 0);
 
@@ -60,7 +72,7 @@ export function AircraftFormModal({ open, initial, onClose, onSave }: AircraftFo
     e.preventDefault();
     setSaving(true);
     setError(null);
-    const result = await onSave({ ...form, seatCapacity: totalSeats }, initial?.id);
+    const result = await onSave({ ...form, seatCapacity: totalSeats }, initial?.id !== undefined ? String(initial.id) : undefined);
     setSaving(false);
     if (!result.ok) {
       setError({ code: result.code ?? 1001, message: result.message ?? "Could not save aircraft." });
@@ -108,8 +120,8 @@ export function AircraftFormModal({ open, initial, onClose, onSave }: AircraftFo
               value={form.airlineCode}
               onChange={(e) => setForm({ ...form, airlineCode: e.target.value })}
             >
-              {MOCK_AIRLINES.map((al) => (
-                <option key={al.id} value={al.iataCarrierCode}>{al.operatorName}</option>
+              {airlines.map((al) => (
+                <option key={al.id || al.code} value={al.code}>{al.name}</option>
               ))}
             </Select>
           </div>

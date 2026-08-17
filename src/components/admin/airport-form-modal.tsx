@@ -14,18 +14,18 @@ interface AirportFormModalProps {
   onSave: (airport: Omit<Airport, "id">, id?: string) => Promise<{ ok: boolean; code?: number; message?: string }>;
 }
 
-const EMPTY = { iataCode: "", name: "", city: "", country: "", latitude: 0, longitude: 0 };
+const EMPTY = { code: "", name: "", city: "", country: "", latitude: 0, longitude: 0 };
 
 export function AirportFormModal({ open, initial, onClose, onSave }: AirportFormModalProps) {
   const [form, setForm] = useState(() =>
     initial
       ? {
-          iataCode: initial.iataCode,
+          code: initial.code || initial.iataCode || "",
           name: initial.name,
-          city: initial.city,
-          country: initial.country,
-          latitude: initial.latitude,
-          longitude: initial.longitude,
+          city: initial.city || "",
+          country: initial.country || "",
+          latitude: initial.latitude || 0,
+          longitude: initial.longitude || 0,
         }
       : EMPTY
   );
@@ -36,7 +36,7 @@ export function AirportFormModal({ open, initial, onClose, onSave }: AirportForm
     e.preventDefault();
     setSaving(true);
     setError(null);
-    const result = await onSave(form, initial?.id);
+    const result = await onSave(form, initial?.id !== undefined ? String(initial.id) : undefined);
     setSaving(false);
     if (!result.ok) {
       setError({ code: result.code ?? 1001, message: result.message ?? "Could not save airport." });
@@ -50,7 +50,7 @@ export function AirportFormModal({ open, initial, onClose, onSave }: AirportForm
       open={open}
       onClose={onClose}
       title={initial ? "Edit airport" : "Add airport"}
-      description="IATA airports power route lookups across search, scheduling, and ticketing."
+      description="Airport codes power route lookups across search, scheduling, and ticketing."
       size="md"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -58,11 +58,11 @@ export function AirportFormModal({ open, initial, onClose, onSave }: AirportForm
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="iataCode">IATA code</Label>
+            <Label htmlFor="code">Airport code</Label>
             <Input
-              id="iataCode"
-              value={form.iataCode}
-              onChange={(e) => setForm({ ...form, iataCode: e.target.value.toUpperCase().slice(0, 3) })}
+              id="code"
+              value={form.code}
+              onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase().slice(0, 3) })}
               placeholder="SGN"
               maxLength={3}
               required

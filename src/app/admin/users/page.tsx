@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Eye } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Eye, Loader2 } from "lucide-react";
 import { User } from "@/types";
-import { MOCK_USERS } from "@/lib/mock/users";
+import { adminApi } from "@/lib/api/admin";
 import { DataTable, Column } from "@/components/admin/data-table";
 import { AdminToolbar } from "@/components/admin/admin-toolbar";
 import { UserDetailModal } from "@/components/admin/user-detail-modal";
@@ -12,61 +12,109 @@ import { Switch } from "@/components/ui/switch";
 import { formatDate } from "@/lib/utils";
 
 export default function UsersAdminPage() {
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [viewing, setViewing] = useState<User | null>(null);
 
+  useEffect(() => {
+    let mounted = true;
+    adminApi.users
+      .getAll()
+      .then((data) => {
+        if (mounted) {
+          setUsers(data || []);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load users:", err);
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return users.filter((u) => {
-      if (roleFilter !== "ALL" && !u.roles.some((r) => r.name === roleFilter)) return false;
+      if (roleFilter !== "ALL" && !u.roles?.some((r) => r.name === roleFilter)) return false;
+      const name = `${u.firstName || ""} ${u.lastName || ""}`.trim();
       return (
-        u.email.toLowerCase().includes(q) ||
-        u.username.toLowerCase().includes(q) ||
-        `${u.firstName} ${u.lastName}`.toLowerCase().includes(q)
+        (u.email && u.email.toLowerCase().includes(q)) ||
+        name.toLowerCase().includes(q)
       );
     });
   }, [users, search, roleFilter]);
 
   async function toggleActive(user: User) {
-    // Simulated PUT /airplane/admin/disable/{email}
-    await new Promise((r) => setTimeout(r, 400));
-    setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, isActive: !u.isActive } : u)));
+    if (!user.email) return;
+    try {
+      await adminApi.users.disable(user.email);
+      setUsers((prev) =>
+        prev.map((u) => (u.email === user.email ? { ...u, isActive: !u.isActive } : u))
+      );
+    } catch (err) {
+      console.error("Failed to disable/toggle user status:", err);
+    }
   }
 
   const columns: Column<User>[] = [
     {
       header: "User",
-      render: (u) => (
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-aviation-900/10 text-xs font-bold text-aviation-900">
-            {u.firstName[0]}{u.lastName[0]}
-          </span>
-          <div>
-            <p className="font-medium text-slate-800">{u.firstName} {u.lastName}</p>
-            <p className="text-xs text-slate-400">{u.email}</p>
+      render: (u) => {
+        const firstInitial = u.firstName ? u.firstName[0] : "";
+        const lastInitial = u.lastName ? u.lastName[0] : "U";
+        return (
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-aviation-900/10 text-xs font-bold text-aviation-900">
+              {firstInitial}{lastInitial}
+            </span>
+            <div>
+              <p className="font-medium text-slate-800">
+                {u.firstName || u.lastName ? `${u.firstName || ""} ${u.lastName || ""}`.trim() : "Unnamed User"}
+              </p>
+              <p className="text-xs text-slate-400">{u.email}</p>
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
-    { header: "Username", render: (u) => <span className="font-mono-data text-sm text-slate-600">{u.username}</span> },
     {
       header: "Role",
       render: (u) => (
         <div className="flex gap-1">
-          {u.roles.map((r) => (
-            <Badge key={r.name} tone={r.name === "ADMIN" ? "aviation" : "neutral"}>{r.name}</Badge>
-          ))}
+          {u.roles && u.roles.length > 0 ? (
+            u.roles.map((r) => (
+              <Badge key={r.name} tone={r.name === "ADMIN" ? "aviation" : "neutral"}>
+                {r.name}
+              </Badge>
+            ))
+          ) : (
+            <Badge tone="neutral">CUSTOMER</Badge>
+          )}
         </div>
       ),
     },
-    { header: "Joined", render: (u) => <span className="text-sm text-slate-500">{formatDate(u.createdAt)}</span> },
+    {
+      header: "Joined",
+      render: (u) => (
+        <span className="text-sm text-slate-500">
+          {u.registeredAt ? formatDate(u.registeredAt) : "N/A"}
+        </span>
+      ),
+    },
     {
       header: "Active",
       align: "center",
       render: (u) => (
-        <Switch checked={u.isActive} onChange={() => toggleActive(u)} label={`Toggle account for ${u.email}`} />
+        <Switch
+          checked={Boolean(u.isActive)}
+          onChange={() => toggleActive(u)}
+          label={`Toggle account for ${u.email}`}
+        />
       ),
     },
     {
@@ -90,7 +138,7 @@ export default function UsersAdminPage() {
       <AdminToolbar
         search={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Search by name, email, or username…"
+        searchPlaceholder="Search by name or email…"
         extra={
           <select
             value={roleFilter}
@@ -108,7 +156,18 @@ export default function UsersAdminPage() {
         {filtered.length} accounts · {filtered.filter((u) => u.isActive).length} active
       </p>
 
-      <DataTable columns={columns} rows={filtered} rowKey={(u) => u.id} emptyMessage="No accounts match your search." />
+      {loading ? (
+        <div className="flex h-64 items-center justify-center rounded-2xl border border-slate-200 bg-white">
+          <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={filtered}
+          rowKey={(u) => String(u.id || u.email)}
+          emptyMessage="No accounts match your search."
+        />
+      )}
 
       <UserDetailModal user={viewing} onClose={() => setViewing(null)} />
     </div>

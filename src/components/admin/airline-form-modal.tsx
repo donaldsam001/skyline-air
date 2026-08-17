@@ -14,17 +14,16 @@ interface AirlineFormModalProps {
   onSave: (airline: Omit<Airline, "id">, id?: string) => Promise<{ ok: boolean; code?: number; message?: string }>;
 }
 
-const EMPTY = { iataCarrierCode: "", operatorName: "", email: "", phone: "", logoColor: "#0B3D91" };
+const EMPTY = { code: "", name: "", contactEmail: "", contactPhone: "" };
 
 export function AirlineFormModal({ open, initial, onClose, onSave }: AirlineFormModalProps) {
   const [form, setForm] = useState(() =>
     initial
       ? {
-          iataCarrierCode: initial.iataCarrierCode,
-          operatorName: initial.operatorName,
-          email: initial.email,
-          phone: initial.phone,
-          logoColor: initial.logoColor ?? "#0B3D91",
+          code: initial.code || initial.iataCarrierCode || "",
+          name: initial.name || initial.operatorName || "",
+          contactEmail: initial.contactEmail || "",
+          contactPhone: initial.contactPhone || "",
         }
       : EMPTY
   );
@@ -35,7 +34,7 @@ export function AirlineFormModal({ open, initial, onClose, onSave }: AirlineForm
     e.preventDefault();
     setSaving(true);
     setError(null);
-    const result = await onSave(form, initial?.id);
+    const result = await onSave(form, initial?.id !== undefined ? String(initial.id) : undefined);
     setSaving(false);
     if (!result.ok) {
       setError({ code: result.code ?? 1001, message: result.message ?? "Could not save airline." });
@@ -60,47 +59,44 @@ export function AirlineFormModal({ open, initial, onClose, onSave }: AirlineForm
             <Label htmlFor="code">Carrier code</Label>
             <Input
               id="code"
-              value={form.iataCarrierCode}
-              onChange={(e) => setForm({ ...form, iataCarrierCode: e.target.value.toUpperCase().slice(0, 2) })}
+              value={form.code}
+              onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase().slice(0, 3) })}
               placeholder="VN"
-              maxLength={2}
+              maxLength={3}
               required
             />
           </div>
           <div>
-            <Label htmlFor="color">Brand color</Label>
-            <div className="flex items-center gap-2">
-              <input
-                id="color"
-                type="color"
-                value={form.logoColor}
-                onChange={(e) => setForm({ ...form, logoColor: e.target.value })}
-                className="h-11 w-14 cursor-pointer rounded-xl border border-slate-300"
-              />
-              <span className="font-mono-data text-sm text-slate-500">{form.logoColor}</span>
-            </div>
+            <Label htmlFor="name">Operator name</Label>
+            <Input
+              id="name"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Skyline Air"
+              required
+            />
           </div>
-        </div>
-
-        <div>
-          <Label htmlFor="operatorName">Operator name</Label>
-          <Input
-            id="operatorName"
-            value={form.operatorName}
-            onChange={(e) => setForm({ ...form, operatorName: e.target.value })}
-            placeholder="Skyline Vietnam Airlines"
-            required
-          />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="email">Contact email</Label>
-            <Input id="email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+            <Label htmlFor="contactEmail">Contact email</Label>
+            <Input
+              id="contactEmail"
+              type="email"
+              value={form.contactEmail}
+              onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
+              required
+            />
           </div>
           <div>
-            <Label htmlFor="phone">Contact phone</Label>
-            <Input id="phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required />
+            <Label htmlFor="contactPhone">Contact phone</Label>
+            <Input
+              id="contactPhone"
+              value={form.contactPhone}
+              onChange={(e) => setForm({ ...form, contactPhone: e.target.value })}
+              required
+            />
           </div>
         </div>
 

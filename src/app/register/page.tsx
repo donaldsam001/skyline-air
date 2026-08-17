@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Mail, Lock, User as UserIcon, Phone, Plane, Check, X } from "lucide-react";
+import { Mail, Lock, Phone, Plane, Check, X } from "lucide-react";
 import { resolveErrorCode } from "@/lib/error-codes";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
@@ -65,20 +65,19 @@ export default function RegisterPage() {
 
       setSuccess(true);
       setTimeout(() => router.push("/login"), 1400);
-    } catch (error: any) {
-      // 3. Robust Error Handling
+    } catch (error: unknown) {
       if (error instanceof ApiError) {
-        // Try parsing error code dynamically if your ApiError returns it, otherwise fall back
-        const errorCode = error.code || 1000; 
+        const errorCode = error.code || 1000;
         const entry = resolveErrorCode(errorCode);
-        setApiError({ 
-          code: errorCode, 
-          message: entry?.message || error.message || "Registration failed. Please try again." 
+        setApiError({
+          code: errorCode,
+          message: entry?.message || error.message || "Registration failed. Please try again.",
         });
       } else {
-        setApiError({ 
-          code: 500, 
-          message: error.message || "An unexpected error occurred." 
+        const msg = error && typeof error === "object" && "message" in error ? String((error as { message: unknown }).message) : "An unexpected error occurred.";
+        setApiError({
+          code: 500,
+          message: msg,
         });
       }
     } finally {

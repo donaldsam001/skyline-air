@@ -13,49 +13,63 @@ interface ETicketModalProps {
 export function ETicketModal({ booking, onClose }: ETicketModalProps) {
   if (!booking) return null;
   const { flight } = booking;
+  const tickets = booking.tickets || [];
 
   return (
     <Modal open={!!booking} onClose={onClose} title="e-Ticket" description={booking.bookingCode} size="md">
       <div className="space-y-4">
-        {booking.tickets.length === 0 ? (
+        {tickets.length === 0 ? (
           <p className="text-sm text-slate-500">
             Tickets will be issued here once payment is confirmed for this booking.
           </p>
         ) : (
-          booking.tickets.map((ticket) => (
-            <div key={ticket.id} className="overflow-hidden rounded-2xl border border-slate-200">
+          tickets.map((ticket, idx) => (
+            <div key={ticket.ticketNumber || idx} className="overflow-hidden rounded-2xl border border-slate-200">
               <div className="flex items-center justify-between bg-aviation-950 px-5 py-4 text-white">
                 <div className="flex items-center gap-2">
                   <Plane className="h-4 w-4 -rotate-45 text-sky-400" />
-                  <span className="font-display text-sm font-bold">{flight.airline.operatorName}</span>
+                  <span className="font-display text-sm font-bold">
+                    {flight?.airline?.name || flight?.airline?.operatorName || "Skyline Air"}
+                  </span>
                 </div>
                 <span className="font-mono-data text-xs text-slate-300">{ticket.ticketNumber}</span>
               </div>
               <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-4">
                 <div>
                   <p className="text-[11px] font-semibold uppercase text-slate-400">Passenger</p>
-                  <p className="mt-0.5 text-sm font-bold text-slate-800">{ticket.passengerName}</p>
+                  <p className="mt-0.5 text-sm font-bold text-slate-800">
+                    {booking.passengers && booking.passengers[idx]
+                      ? `${booking.passengers[idx].firstName} ${booking.passengers[idx].lastName}`
+                      : booking.user?.firstName || "Passenger"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-[11px] font-semibold uppercase text-slate-400">Flight</p>
-                  <p className="mt-0.5 font-mono-data text-sm font-bold text-slate-800">{flight.flightNumber}</p>
+                  <p className="mt-0.5 font-mono-data text-sm font-bold text-slate-800">{flight?.flightNumber || "N/A"}</p>
                 </div>
                 <div>
                   <p className="text-[11px] font-semibold uppercase text-slate-400">Seat</p>
-                  <p className="mt-0.5 font-mono-data text-sm font-bold text-slate-800">{ticket.seatNumber}</p>
+                  <p className="mt-0.5 font-mono-data text-sm font-bold text-slate-800">{ticket.seatNumber || "Assigned at gate"}</p>
                 </div>
                 <div>
                   <p className="text-[11px] font-semibold uppercase text-slate-400">Cabin</p>
-                  <p className="mt-0.5 text-sm font-bold text-slate-800">{CABIN_LABELS[ticket.cabin]}</p>
+                  <p className="mt-0.5 text-sm font-bold text-slate-800">
+                    {(ticket.seatType && CABIN_LABELS[ticket.seatType]) ||
+                      (ticket.cabin && CABIN_LABELS[ticket.cabin]) ||
+                      ticket.seatType ||
+                      ticket.cabin ||
+                      "Economy"}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center justify-between border-t border-dashed border-slate-200 px-5 py-4">
                 <div>
                   <p className="text-xs text-slate-500">
-                    {flight.departureAirport.iataCode} → {flight.destinationAirport.iataCode}
+                    {flight?.departureAirport?.code || flight?.departureAirport?.iataCode || "N/A"} →{" "}
+                    {flight?.destinationAirport?.code || flight?.destinationAirport?.iataCode || "N/A"}
                   </p>
                   <p className="mt-0.5 text-xs font-semibold text-slate-700">
-                    {formatDate(flight.departureTime)} · {formatTime(flight.departureTime)}
+                    {flight?.departureTime ? `${formatDate(flight.departureTime)} · ${formatTime(flight.departureTime)}` : "TBD"}
                   </p>
                 </div>
                 <QrCode className="h-12 w-12 text-slate-300" />

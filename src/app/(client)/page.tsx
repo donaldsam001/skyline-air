@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ShieldCheck, Clock3, Wallet, ArrowRight, Plane, Globe, Sparkles } from "lucide-react";
+import { ShieldCheck, Clock3, Wallet, ArrowRight, Globe, Sparkles } from "lucide-react";
 import { FlightSearchBar } from "@/components/client/flight-search-bar";
 import { Airline } from "@/types";
 import { api } from "@/lib/api/client";

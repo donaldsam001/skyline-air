@@ -5,9 +5,6 @@ import Link from "next/link";
 import {
   User as UserIcon,
   Ticket,
-  Heart,
-  CreditCard,
-  Settings,
   HelpCircle,
   LogOut,
   ChevronDown,
@@ -126,7 +123,7 @@ export function UserMenuPopover({ user, isAdmin, onLogout }: UserMenuPopoverProp
             </Link>
 
             <Link
-              href="/security"
+              href="/my-profile?tab=security"
               onClick={() => setIsOpen(false)}
               className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 transition-colors"
             >
@@ -135,12 +132,12 @@ export function UserMenuPopover({ user, isAdmin, onLogout }: UserMenuPopoverProp
             </Link>
 
             <Link
-              href="/wallet"
+              href="/flights"
               onClick={() => setIsOpen(false)}
               className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 transition-colors"
             >
               <Globe className="h-4 w-4 text-slate-500" />
-              <span>Wallet</span>
+              <span>Search Flights</span>
             </Link>
 
           </div>
@@ -150,12 +147,12 @@ export function UserMenuPopover({ user, isAdmin, onLogout }: UserMenuPopoverProp
           {/* Help & Settings */}
           <div className="py-1">
             <Link
-              href="/help"
+              href="/my-profile"
               onClick={() => setIsOpen(false)}
               className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 transition-colors"
             >
               <HelpCircle className="h-4 w-4 text-slate-500" />
-              <span>Customer Service Help</span>
+              <span>Customer Support</span>
             </Link>
           </div>
 

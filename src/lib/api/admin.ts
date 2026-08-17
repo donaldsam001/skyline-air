@@ -94,7 +94,7 @@ export const adminApi = {
       payload: Partial<Flight>
     ): Promise<Flight> => {
       const { data } = await axiosInstance.post<Flight>(
-        `/admin/${airlineCode}/${aircraftCode}/${departureCode}/${destinationCode}/flight`,
+        `/admin/${airlineCode}/${aircraftCode}/${departureCode}/${destinationCode}/flights`,
         payload
       );
       return data;

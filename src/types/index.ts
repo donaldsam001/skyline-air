@@ -4,15 +4,16 @@ export type CabinTier = "ECONOMY" | "PREMIUM_ECONOMY" | "BUSINESS" | "FIRST";
 export type PassengerType = "ADULT" | "CHILD" | "INFANT";
 export type BookingStatus = "PENDING" | "CREATED" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
 export type PaymentStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED";
-export type PaymentMethod = "CREDIT_CARD" | "BANK_TRANSFER" | "E_WALLET" | "CASH";
-export type FlightStatus = "SCHEDULED" | "BOARDING" | "DEPARTED" | "IN_FLIGHT" | "DELAYED" | "ARRIVED" | "CANCELLED";
+export type PaymentMethod = "CREDIT_CARD" | "BANK_TRANSFER" | "E_WALLET" | "CASH" | "DIGITAL_WALLET";
+export type FlightStatus = "SCHEDULED" | "BOARDING" | "DEPARTED" | "IN_FLIGHT" | "DELAYED" | "ARRIVED" | "CANCELLED" | "COMPLETED";
 export type SeatType = "ECONOMY" | "PREMIUM_ECONOMY" | "BUSINESS" | "FIRST_CLASS";
 export type TicketStatus = "ISSUED" | "CANCELLED" | "REFUNDED" | "USED";
 
-export interface Permission {
+export interface PermissionObj {
   name: string;
   description: string;
 }
+export type Permission = PermissionObj | string;
 
 export interface Role {
   name: "ADMIN" | "CUSTOMER" | "STAFF" | string;
@@ -20,11 +21,10 @@ export interface Role {
   permissions?: Permission[];
 }
 
-
-
 export interface User {
-  id?: number;
+  id?: number | string;
   email: string;
+  username?: string;
   firstName?: string;
   lastName?: string;
   phone?: string;
@@ -35,13 +35,15 @@ export interface User {
   gender?: "MALE" | "FEMALE";
   isActive?: boolean;
   registeredAt?: string; // ISO-8601 DateTime string
+  createdAt?: string;
   roles?: Role[];
 }
 
 export interface Airport {
-  id?: number;
-  code: string;
-  name: string;
+  id?: number | string;
+  code?: string;
+  iataCode?: string;
+  name?: string;
   city?: string;
   country?: string;
   latitude?: number;
@@ -49,26 +51,36 @@ export interface Airport {
 }
 
 export interface Airline {
-  id?: number;
-  name: string;
-  code: string;
+  id?: number | string;
+  name?: string;
+  code?: string;
+  iataCarrierCode?: string;
+  operatorName?: string;
+  email?: string;
+  phone?: string;
   contactEmail?: string;
   contactPhone?: string;
-}
-
-export interface Aircraft {
-  id?: number;
-  model: string;
-  registrationNumber: string;
-  totalSeats: number;
-  seatConfiguration?: string; // JSON string
-  airline?: Airline;
+  logoColor?: string;
 }
 
 export interface SeatConfigSegment {
   cabin: CabinTier;
   seats: number;
   basePriceMultiplier: number;
+}
+
+export interface Aircraft {
+  id?: number | string;
+  code?: string;
+  model: string;
+  registrationNumber?: string;
+  tailRegistration?: string;
+  totalSeats?: number;
+  seatCapacity?: number;
+  airlineCode?: string;
+  seatConfig?: SeatConfigSegment[];
+  seatConfiguration?: string; // JSON string
+  airline?: Airline;
 }
 
 export interface FareRule {
@@ -79,7 +91,7 @@ export interface FareRule {
 }
 
 export interface Flight {
-  id?: number;
+  id?: number | string;
   flightNumber: string;
   departureAirport: Airport;
   destinationAirport: Airport;
@@ -87,15 +99,15 @@ export interface Flight {
   arrivalTime: string; // ISO-8601 DateTime string
   airline?: Airline;
   aircraft?: Aircraft;
+  basePrice?: number;
   totalSeats?: number;
   availableSeats?: number;
-  fareRules?: string; // JSON string
+  fareRules?: string | FareRule[];
   flightStatus: FlightStatus;
 }
 
-
 export interface Passenger {
-  id?: number;
+  id?: number | string;
   firstName: string;
   lastName: string;
   passengerType: PassengerType;
@@ -104,37 +116,41 @@ export interface Passenger {
   nationality: string;
 }
 
-
 export interface Payment {
-  id?: number;
+  id?: number | string;
   transactionRef: string;
   amount: number;
   paymentMethod: PaymentMethod;
   status: PaymentStatus;
-  paidAt?: string; // ISO-8601 DateTime string
+  paidAt?: string | null; // ISO-8601 DateTime string
   gatewayResponse?: string;
 }
 
 export interface Ticket {
+  id?: number | string;
   ticketNumber: string;
-  seatType: SeatType;
+  seatType?: SeatType;
+  cabin?: CabinTier;
   seatNumber?: string;
-  price: number;
-  status: TicketStatus;
+  passengerName?: string;
+  price?: number;
+  status?: TicketStatus;
   issuedAt: string; // ISO-8601 DateTime string
 }
 
 export interface Booking {
-  id?: number;
+  id?: number | string;
   bookingCode: string;
   flight: Flight;
   user?: User;
+  bookedBy?: string;
   seatType: SeatType;
   totalPrice: number;
   status: BookingStatus;
   paymentStatus: PaymentStatus;
   notes?: string;
   createdAt: string; // ISO-8601 DateTime string
+  bookingDate?: string;
   passengers?: Passenger[];
   payments?: Payment[];
   tickets?: Ticket[];

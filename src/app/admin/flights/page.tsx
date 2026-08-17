@@ -1,39 +1,53 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Pencil, Trash2, Loader2 } from "lucide-react";
 import { Flight, FlightStatus } from "@/types";
-import { MOCK_FLIGHTS } from "@/lib/mock/flights";
-import { findAirport, findAirline } from "@/lib/mock/airports-airlines";
-import { MOCK_AIRCRAFT } from "@/lib/mock/aircraft";
+import { adminApi } from "@/lib/api/admin";
 import { DataTable, Column } from "@/components/admin/data-table";
 import { AdminToolbar } from "@/components/admin/admin-toolbar";
 import { FlightFormModal } from "@/components/admin/flight-form-modal";
 import { ConfirmDeleteModal } from "@/components/admin/confirm-delete-modal";
 import { Badge, flightStatusTone } from "@/components/ui/badge";
-import { formatCurrency, formatDate, formatTime } from "@/lib/utils";
-
-let idCounter = 5000;
+import { formatCurrency, formatDate, formatTime, parseFareRules } from "@/lib/utils";
 
 export default function FlightSchedulerPage() {
-  const [flights, setFlights] = useState<Flight[]>(
-    [...MOCK_FLIGHTS].sort((a, b) => a.departureTime.localeCompare(b.departureTime)).slice(0, 60)
-  );
+  const [flights, setFlights] = useState<Flight[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Flight | null>(null);
   const [deleting, setDeleting] = useState<Flight | null>(null);
 
+  const fetchFlights = async () => {
+    try {
+      setLoading(true);
+      const data = await adminApi.flights.getAll();
+      setFlights(data || []);
+    } catch (err) {
+      console.error("Failed to fetch admin flights:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFlights();
+  }, []);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return flights.filter((f) => {
       if (statusFilter !== "ALL" && f.flightStatus !== statusFilter) return false;
+      const depCode = f.departureAirport?.code || f.departureAirport?.iataCode || "";
+      const destCode = f.destinationAirport?.code || f.destinationAirport?.iataCode || "";
+      const airlineName = f.airline?.name || f.airline?.operatorName || "";
       return (
         f.flightNumber.toLowerCase().includes(q) ||
-        f.departureAirport.iataCode.toLowerCase().includes(q) ||
-        f.destinationAirport.iataCode.toLowerCase().includes(q) ||
-        f.airline.operatorName.toLowerCase().includes(q)
+        depCode.toLowerCase().includes(q) ||
+        destCode.toLowerCase().includes(q) ||
+        airlineName.toLowerCase().includes(q)
       );
     });
   }, [flights, search, statusFilter]);
@@ -52,76 +66,51 @@ export default function FlightSchedulerPage() {
     },
     id?: string
   ) {
-    // Simulated POST /airplane/admin/{airlineCode}/{aircraftCode}/{departureCode}/{destinationCode}/flight
-    await new Promise((r) => setTimeout(r, 600));
-
-    if (!id && flights.some((f) => f.flightNumber === payload.flightNumber)) {
-      return { ok: false, code: 2004, message: "Flight number already exists for this airline." };
-    }
     if (new Date(payload.arrivalTime) <= new Date(payload.departureTime)) {
       return { ok: false, code: 2003, message: "Arrival time must be after departure time." };
     }
 
-    const airline = findAirline(payload.airlineCode)!;
-    const aircraft = MOCK_AIRCRAFT.find((a) => a.id === payload.aircraftId)!;
-    const departureAirport = findAirport(payload.departureCode)!;
-    const destinationAirport = findAirport(payload.destinationCode)!;
-
-    const fareRules = aircraft.seatConfig.map((seg) => ({
-      cabin: seg.cabin,
-      basePrice: Math.round(payload.basePrice * seg.basePriceMultiplier),
-      refundable: seg.cabin !== "ECONOMY",
-      changeFeeUSD: seg.cabin === "ECONOMY" ? 35 : 0,
-    }));
-
-    if (id) {
-      setFlights((prev) =>
-        prev.map((f) =>
-          f.id === id
-            ? {
-                ...f,
-                flightNumber: payload.flightNumber,
-                airline,
-                aircraft,
-                departureAirport,
-                destinationAirport,
-                departureTime: payload.departureTime,
-                arrivalTime: payload.arrivalTime,
-                fareRules,
-                flightStatus: payload.flightStatus,
-                totalSeats: aircraft.seatCapacity,
-              }
-            : f
-        )
-      );
-    } else {
-      idCounter += 1;
-      setFlights((prev) => [
-        {
-          id: `fl-${idCounter}`,
-          flightNumber: payload.flightNumber,
-          departureAirport,
-          destinationAirport,
+    try {
+      if (id) {
+        await adminApi.flights.update(payload.flightNumber, {
           departureTime: payload.departureTime,
           arrivalTime: payload.arrivalTime,
-          airline,
-          aircraft,
-          totalSeats: aircraft.seatCapacity,
-          availableSeats: aircraft.seatCapacity,
-          fareRules,
+          basePrice: payload.basePrice,
           flightStatus: payload.flightStatus,
-        },
-        ...prev,
-      ]);
+        });
+      } else {
+        await adminApi.flights.create(
+          payload.airlineCode,
+          payload.aircraftId,
+          payload.departureCode,
+          payload.destinationCode,
+          {
+            flightNumber: payload.flightNumber,
+            departureTime: payload.departureTime,
+            arrivalTime: payload.arrivalTime,
+            basePrice: payload.basePrice,
+            flightStatus: payload.flightStatus,
+          }
+        );
+      }
+      await fetchFlights();
+      return { ok: true };
+    } catch (err: unknown) {
+      const msg = err && typeof err === "object" && "message" in err ? String((err as { message: unknown }).message) : "Failed to save flight.";
+      return { ok: false, code: 500, message: msg };
     }
-    return { ok: true };
   }
 
   async function handleDelete() {
     if (!deleting) return;
-    await new Promise((r) => setTimeout(r, 400));
-    setFlights((prev) => prev.filter((f) => f.id !== deleting.id));
-    setDeleting(null);
+    try {
+      await adminApi.flights.delete(deleting.flightNumber);
+      await fetchFlights();
+    } catch (err) {
+      console.error("Failed to delete flight:", err);
+    } finally {
+      setDeleting(null);
+    }
   }
 
   const columns: Column<Flight>[] = [
@@ -130,7 +119,7 @@ export default function FlightSchedulerPage() {
       render: (f) => (
         <div>
           <p className="font-mono-data text-sm font-bold text-aviation-900">{f.flightNumber}</p>
-          <p className="text-xs text-slate-400">{f.airline.operatorName}</p>
+          <p className="text-xs text-slate-400">{f.airline?.name || f.airline?.operatorName || "Carrier"}</p>
         </div>
       ),
     },
@@ -138,7 +127,8 @@ export default function FlightSchedulerPage() {
       header: "Route",
       render: (f) => (
         <span className="font-mono-data text-sm text-slate-700">
-          {f.departureAirport.iataCode} → {f.destinationAirport.iataCode}
+          {f.departureAirport?.code || f.departureAirport?.iataCode || "N/A"} →{" "}
+          {f.destinationAirport?.code || f.destinationAirport?.iataCode || "N/A"}
         </span>
       ),
     },
@@ -156,18 +146,22 @@ export default function FlightSchedulerPage() {
       align: "center",
       render: (f) => (
         <span className="font-mono-data text-sm text-slate-700">
-          {f.availableSeats}/{f.totalSeats}
+          {f.availableSeats}/{f.totalSeats || 180}
         </span>
       ),
     },
     {
       header: "From",
       align: "right",
-      render: (f) => (
-        <span className="font-mono-data text-sm font-semibold text-slate-800">
-          {formatCurrency(Math.min(...f.fareRules.map((r) => r.basePrice)))}
-        </span>
-      ),
+      render: (f) => {
+        const rules = parseFareRules(f.fareRules, f.basePrice);
+        const minPrice = rules.length > 0 ? Math.min(...rules.map((r) => r.basePrice)) : f.basePrice || 0;
+        return (
+          <span className="font-mono-data text-sm font-semibold text-slate-800">
+            {formatCurrency(minPrice)}
+          </span>
+        );
+      },
     },
     {
       header: "Status",
@@ -222,7 +216,13 @@ export default function FlightSchedulerPage() {
 
       <p className="text-xs text-slate-400">Showing {filtered.length} of {flights.length} scheduled flights.</p>
 
-      <DataTable columns={columns} rows={filtered} rowKey={(f) => f.id} emptyMessage="No flights match your filters." />
+      {loading ? (
+        <div className="flex h-64 items-center justify-center rounded-2xl border border-slate-200 bg-white">
+          <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        </div>
+      ) : (
+        <DataTable columns={columns} rows={filtered} rowKey={(f) => String(f.id || f.flightNumber)} emptyMessage="No flights match your filters." />
+      )}
 
       <FlightFormModal key={editing?.id ?? "new"} open={modalOpen} initial={editing} onClose={() => setModalOpen(false)} onSave={handleSave} />
       <ConfirmDeleteModal

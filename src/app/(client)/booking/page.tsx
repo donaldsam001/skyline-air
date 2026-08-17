@@ -19,7 +19,7 @@ export default function BookingIndexPage() {
         Select a flight to book
       </h1>
       <p className="max-w-sm text-center text-sm text-slate-500">
-        To start booking, search for available flights and select the one you'd like to fly.
+        To start booking, search for available flights and select the one you&apos;d like to fly.
       </p>
       <Button variant="cta" onClick={() => router.push("/flights")}>
         Search flights

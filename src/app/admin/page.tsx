@@ -12,11 +12,13 @@ import {
   formatDate,
 } from "@/lib/utils";
 
+import { Flight, Booking, User, Payment } from "@/types";
+
 export default function AdminDashboardPage() {
-  const [flights, setFlights] = useState<any[]>([]);
-  const [bookings, setBookings] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
-  const [payments, setPayments] = useState<any[]>([]);
+  const [flights, setFlights] = useState<Flight[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,7 +26,6 @@ export default function AdminDashboardPage() {
 
     async function fetchData() {
       try {
-        // Fetch the correct entities for the dashboard metrics
         const [flightsData, bookingsData, usersData, paymentsData] = await Promise.all([
           adminApi.flights.getAll(),
           adminApi.bookings.getAll(),
@@ -51,16 +52,14 @@ export default function AdminDashboardPage() {
   }, []);
 
   const stats = useMemo(() => {
-    // Safely calculate stats based on the fetched data
     const activeBookings = bookings.filter(b => b.status === "CREATED" || b.status === "CONFIRMED").length;
     
-    // Assuming payments have a 'status' (e.g., PENDING) and an 'amount'
-    const pendingPayments = payments.filter(p => p.paymentStatus === "PENDING").length;
+    const pendingPayments = payments.filter(p => p.status === "PENDING").length;
     const totalRevenue = payments
-      .filter(p => p.paymentStatus === "COMPLETED" || p.paymentStatus === "SUCCESS")
+      .filter(p => p.status === "PAID")
       .reduce((sum, p) => sum + (p.amount || 0), 0);
       
-    const activeUsers = users.filter(u => u.active !== false).length; // Adjust based on your User entity
+    const activeUsers = users.filter(u => u.isActive !== false).length;
 
     return {
       totalFlights: flights.length,
@@ -80,10 +79,9 @@ export default function AdminDashboardPage() {
       .slice(0, 5);
   }, [flights]);
 
-  // Sort bookings to show the newest ones first
   const recentBookings = useMemo(() => {
     return [...bookings]
-      .sort((a, b) => new Date(b.bookingDate || 0).getTime() - new Date(a.bookingDate || 0).getTime())
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
       .slice(0, 5);
   }, [bookings]);
 
@@ -147,7 +145,7 @@ export default function AdminDashboardPage() {
                   <div>
                     <p className="font-mono-data text-sm font-semibold text-slate-800">{b.bookingCode}</p>
                     <p className="text-xs text-slate-400">
-                      {b.flight?.flightNumber || "Unknown Flight"} · {b.user?.email || b.user?.username || "Guest"}
+                      {b.flight?.flightNumber || "Unknown Flight"} · {b.user?.email || "Guest"}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -177,7 +175,7 @@ export default function AdminDashboardPage() {
                   <div>
                     <p className="font-mono-data text-sm font-semibold text-slate-800">{f.flightNumber}</p>
                     <p className="text-xs text-slate-400">
-                      {f.departureAirport?.iataCode || "N/A"} → {f.destinationAirport?.iataCode || "N/A"}
+                      {f.departureAirport?.code || "N/A"} → {f.destinationAirport?.code || "N/A"}
                     </p>
                   </div>
                   <div className="text-right">

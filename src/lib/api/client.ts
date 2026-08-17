@@ -15,7 +15,6 @@ import {
   CancelRequest,
   PaymentGatewayResponse,
   Payment,
-  PaymentRequest,
 } from "@/types";
 
 /**
@@ -43,17 +42,30 @@ export const api = {
   },
 
   // ----------------------------------------------------
-  // Flights (Search & Detail)"/flights/search/round-trip")
+  // Flights (Search & Detail)
   // ----------------------------------------------------
   flights: {
+    /** POST /admin/flights/search/round-trip */
     async searchRoundTrip(params: FlightSearchParams): Promise<Flight[]> {
-      const { data } = await axiosInstance.post<Flight[]>("/admin/flights/search/round-trip", params);
+      const body = {
+        fromAirportCode: params.from || null,
+        toAirportCode: params.to || null,
+        startDate: params.startDate || null,
+        endDate: params.endDate || null,
+      };
+      const { data } = await axiosInstance.post<Flight[]>("/admin/flights/search/round-trip", body);
       return data;
     },
 
     /** POST /admin/flights/search — search by route & dates */
     async search(params: FlightSearchParams): Promise<Flight[]> {
-      const { data } = await axiosInstance.post<Flight[]>("/admin/flights/search", params);
+      const body = {
+        fromAirportCode: params.from || null,
+        toAirportCode: params.to || null,
+        departFrom: params.startDate || null,
+        departTo: params.endDate || params.startDate || null,
+      };
+      const { data } = await axiosInstance.post<Flight[]>("/admin/flights/search", body);
       return data;
     },
 
@@ -63,10 +75,16 @@ export const api = {
       return data;
     },
 
-    /** GET /admin/flights/{flightNumber} — single flight detail */
+    /** Find single flight detail from list */
     async get(flightNumber: string): Promise<Flight> {
-      const { data } = await axiosInstance.get<Flight>(`/admin/flights/${flightNumber}`);
-      return data;
+      const flights = await this.getAll();
+      const found = flights.find(
+        (f) => f.flightNumber === flightNumber || String(f.id) === flightNumber
+      );
+      if (!found) {
+        throw new Error("Flight not found");
+      }
+      return found;
     },
   },
 
@@ -94,8 +112,20 @@ export const api = {
 
     /** GET /users/bookings — current user's bookings */
     async getMyBookings(): Promise<Booking[]> {
-      const { data } = await axiosInstance.get<Booking[]>("/users/bookings");
-      return data;
+      try {
+        const { data } = await axiosInstance.get<Booking[]>("/users/bookings");
+        return data || [];
+      } catch (err: unknown) {
+        if (
+          err &&
+          typeof err === "object" &&
+          "code" in err &&
+          (err as { code: number }).code === 1005
+        ) {
+          return [];
+        }
+        throw err;
+      }
     },
 
     /** POST /users/{flightNumber}/booking — create booking */
@@ -158,7 +188,7 @@ export const api = {
   // ----------------------------------------------------
   aircraft: {
     async getAll(): Promise<Aircraft[]> {
-      const { data } = await axiosInstance.get<Aircraft[]>("/admin/aircraft");
+      const { data } = await axiosInstance.get<Aircraft[]>("/admin/aircrafts");
       return data;
     },
   },

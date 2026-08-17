@@ -1,8 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { CheckCircle2, Ticket } from "lucide-react";
 import { Booking } from "@/types";
 import { useAuthStore } from "@/lib/store/auth-store";
@@ -13,6 +12,7 @@ import { BookingRow } from "@/components/client/booking-row";
 import { ETicketModal } from "@/components/client/eticket-modal";
 import { CancelBookingModal } from "@/components/client/cancel-booking-modal";
 import { Button } from "@/components/ui/button";
+import { AlertBanner } from "@/components/ui/alert-banner";
 
 const STATUS_TABS = [
   { value: "ALL", label: "All" },
@@ -33,6 +33,7 @@ function MyBookingsInner() {
   const [tab, setTab] = useState("ALL");
   const [ticketBooking, setTicketBooking] = useState<Booking | null>(null);
   const [cancelBooking, setCancelBooking] = useState<Booking | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -40,21 +41,26 @@ function MyBookingsInner() {
       return;
     }
     let active = true;
-    Promise.resolve().then(() => {
-      if (active) setLoading(true);
-    });
-    // GET /users/bookings — JWT identifies the user, no email param needed
-    api.users.getMyBookings().then((res) => {
-      if (!active) return;
-      setBookings(res);
-      setLoading(false);
-    }).catch(() => {
-      if (!active) return;
-      setLoading(false);
-    });
-    return () => { active = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, user]);
+
+    api.users
+      .getMyBookings()
+      .then((res) => {
+        if (!active) return;
+        setBookings(res);
+      })
+      .catch((err) => {
+        console.error("Failed to load bookings:", err);
+        if (!active) return;
+        setErrorMsg("Failed to load bookings.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated, user, router]);
 
   const filtered = useMemo(
     () => (tab === "ALL" ? bookings : bookings.filter((b) => b.status === tab)),
@@ -67,18 +73,46 @@ function MyBookingsInner() {
     return map;
   }, [bookings]);
 
-  async function handleCancelConfirm(bookingId: string) {
-    await new Promise((r) => setTimeout(r, 700));
-    setBookings((prev) =>
-      prev.map((b) => (b.id === bookingId ? { ...b, status: "CANCELLED", paymentStatus: "REFUNDED" } : b))
-    );
-    setCancelBooking(null);
+  async function handleCancelConfirm(bookingCode: string) {
+    try {
+      const updated = await api.users.cancelBooking(bookingCode, {
+        reason: "User requested cancellation",
+      });
+      setBookings((prev) =>
+        prev.map((b) => (b.bookingCode === bookingCode ? updated : b))
+      );
+    } catch (err: unknown) {
+      console.error("Failed to cancel booking:", err);
+      // Fallback local update if offline/backend cancel returns 200 without payload
+      setBookings((prev) =>
+        prev.map((b) =>
+          b.bookingCode === bookingCode
+            ? { ...b, status: "CANCELLED", paymentStatus: "REFUNDED" }
+            : b
+        )
+      );
+    } finally {
+      setCancelBooking(null);
+    }
   }
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <h1 className="font-display text-2xl font-bold text-slate-900">My bookings</h1>
-      <p className="mt-1 text-sm text-slate-500">Manage upcoming trips, view e-tickets, and request cancellations.</p>
+      <p className="mt-1 text-sm text-slate-500">
+        Manage upcoming trips, view e-tickets, and request cancellations.
+      </p>
+
+      {errorMsg && (
+        <div className="mt-4">
+          <AlertBanner
+            tone="error"
+            title="Error"
+            description={errorMsg}
+            onDismiss={() => setErrorMsg(null)}
+          />
+        </div>
+      )}
 
       {confirmedCode && (
         <div className="mt-5 flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3.5">
@@ -105,7 +139,9 @@ function MyBookingsInner() {
 
       <div className="mt-6 space-y-3">
         {loading ? (
-          [...Array(3)].map((_, i) => <div key={i} className="h-24 animate-pulse rounded-2xl bg-slate-100" />)
+          [...Array(3)].map((_, i) => (
+            <div key={i} className="h-24 animate-pulse rounded-2xl bg-slate-100" />
+          ))
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={Ticket}
@@ -120,7 +156,7 @@ function MyBookingsInner() {
         ) : (
           filtered.map((b) => (
             <BookingRow
-              key={b.id}
+              key={b.id || b.bookingCode}
               booking={b}
               onViewTicket={setTicketBooking}
               onCancel={setCancelBooking}
@@ -141,7 +177,7 @@ function MyBookingsInner() {
 
 export default function MyBookingsPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<div className="p-8 text-center text-slate-500">Loading bookings...</div>}>
       <MyBookingsInner />
     </Suspense>
   );

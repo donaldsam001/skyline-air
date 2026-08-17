@@ -10,7 +10,7 @@ import { formatCurrency } from "@/lib/utils";
 interface CancelBookingModalProps {
   booking: Booking | null;
   onClose: () => void;
-  onConfirm: (bookingId: string) => Promise<void>;
+  onConfirm: (bookingCode: string) => Promise<void>;
 }
 
 export function CancelBookingModal({ booking, onClose, onConfirm }: CancelBookingModalProps) {
@@ -19,7 +19,7 @@ export function CancelBookingModal({ booking, onClose, onConfirm }: CancelBookin
   async function handleConfirm() {
     if (!booking) return;
     setSubmitting(true);
-    await onConfirm(booking.id);
+    await onConfirm(booking.bookingCode);
     setSubmitting(false);
   }
 

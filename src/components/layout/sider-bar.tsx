@@ -7,41 +7,29 @@ import {
   Lock,
   Users,
   Sliders,
-  CreditCard,
-  ShieldCheck,
 } from "lucide-react";
 
 // Sidebar navigation items config
 const navItems = [
   {
     label: "Personal details",
-    href: "/account/personal-details",
+    href: "/my-profile",
     icon: User,
   },
   {
     label: "Security settings",
-    href: "/account/security",
+    href: "/my-profile?tab=security",
     icon: Lock,
   },
   {
-    label: "Other travellers",
-    href: "/account/travellers",
+    label: "My Bookings & Trips",
+    href: "/my-bookings",
     icon: Users,
   },
   {
-    label: "Customisation preferences",
-    href: "/account/preferences",
+    label: "Flight Search",
+    href: "/flights",
     icon: Sliders,
-  },
-  {
-    label: "Payment methods",
-    href: "/account/payment-methods",
-    icon: CreditCard,
-  },
-  {
-    label: "Privacy and data management",
-    href: "/account/privacy",
-    icon: ShieldCheck,
   },
 ];
 

@@ -1,80 +1,104 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { MOCK_BOOKINGS } from "@/lib/mock/bookings";
+import { useEffect, useMemo, useState } from "react";
+import { adminApi } from "@/lib/api/admin";
 import { DataTable, Column } from "@/components/admin/data-table";
 import { AdminToolbar } from "@/components/admin/admin-toolbar";
 import { Badge, paymentStatusTone } from "@/components/ui/badge";
 import { StatCard } from "@/components/ui/stat-card";
-import { CreditCard, CheckCircle2, Clock3, RotateCcw } from "lucide-react";
+import { CreditCard, CheckCircle2, Clock3, RotateCcw, Loader2 } from "lucide-react";
 import { Payment } from "@/types";
 import { formatCurrency, formatDateLong } from "@/lib/utils";
 
 interface PaymentRow extends Payment {
-  bookingCode: string;
-  customerEmail: string;
+  bookingCode?: string;
+  customerEmail?: string;
 }
 
 export default function AdminPaymentsPage() {
+  const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  const allPayments: PaymentRow[] = useMemo(
-    () =>
-      MOCK_BOOKINGS.flatMap((b) =>
-        b.payments.map((p) => ({ ...p, bookingCode: b.bookingCode, customerEmail: b.bookedBy }))
-      ),
-    []
-  );
+  useEffect(() => {
+    let mounted = true;
+    adminApi.payments
+      .getAll()
+      .then((data) => {
+        if (mounted) {
+          setPayments(data || []);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load admin payments:", err);
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return allPayments.filter(
+    return payments.filter(
       (p) =>
-        p.transactionRef.toLowerCase().includes(q) ||
-        p.bookingCode.toLowerCase().includes(q) ||
-        p.customerEmail.toLowerCase().includes(q)
+        (p.transactionRef && p.transactionRef.toLowerCase().includes(q)) ||
+        (p.bookingCode && p.bookingCode.toLowerCase().includes(q)) ||
+        (p.customerEmail && p.customerEmail.toLowerCase().includes(q))
     );
-  }, [allPayments, search]);
+  }, [payments, search]);
 
   const totals = useMemo(() => {
-    const paid = allPayments.filter((p) => p.status === "PAID");
-    const pending = allPayments.filter((p) => p.status === "PENDING");
-    const refunded = allPayments.filter((p) => p.status === "REFUNDED");
+    const paid = payments.filter((p) => p.status === "PAID");
+    const pending = payments.filter((p) => p.status === "PENDING");
+    const refunded = payments.filter((p) => p.status === "REFUNDED");
     return {
-      collected: paid.reduce((s, p) => s + p.amount, 0),
+      collected: paid.reduce((s, p) => s + (p.amount || 0), 0),
       pendingCount: pending.length,
-      refundedAmount: refunded.reduce((s, p) => s + p.amount, 0),
+      refundedAmount: refunded.reduce((s, p) => s + (p.amount || 0), 0),
     };
-  }, [allPayments]);
+  }, [payments]);
 
   const columns: Column<PaymentRow>[] = [
     {
       header: "Transaction",
       render: (p) => (
         <div>
-          <p className="font-mono-data text-sm font-bold text-slate-800">{p.transactionRef}</p>
-          <p className="text-xs text-slate-400">{p.bookingCode}</p>
+          <p className="font-mono-data text-sm font-bold text-slate-800">{p.transactionRef || "N/A"}</p>
+          <p className="text-xs text-slate-400">{p.bookingCode || "Booking"}</p>
         </div>
       ),
     },
-    { header: "Customer", render: (p) => <span className="text-sm text-slate-600">{p.customerEmail}</span> },
+    {
+      header: "Customer",
+      render: (p) => <span className="text-sm text-slate-600">{p.customerEmail || "Customer"}</span>,
+    },
     {
       header: "Method",
       render: (p) => (
         <span className="text-sm text-slate-600">
-          {p.paymentMethod === "CREDIT_CARD" ? "Credit card" : "Digital wallet"}
+          {p.paymentMethod === "CREDIT_CARD" ? "Credit card" : p.paymentMethod || "Digital Wallet"}
         </span>
       ),
     },
     {
       header: "Amount",
       align: "right",
-      render: (p) => <span className="font-mono-data font-semibold text-slate-800">{formatCurrency(p.amount)}</span>,
+      render: (p) => (
+        <span className="font-mono-data font-semibold text-slate-800">
+          {formatCurrency(p.amount || 0)}
+        </span>
+      ),
     },
     { header: "Status", render: (p) => <Badge tone={paymentStatusTone(p.status)}>{p.status}</Badge> },
     {
       header: "Paid at",
-      render: (p) => <span className="text-xs text-slate-500">{p.paidAt ? formatDateLong(p.paidAt) : "—"}</span>,
+      render: (p) => (
+        <span className="text-xs text-slate-500">
+          {p.paidAt ? formatDateLong(p.paidAt) : "—"}
+        </span>
+      ),
     },
   ];
 
@@ -93,7 +117,18 @@ export default function AdminPaymentsPage() {
         extra={<CreditCard className="hidden h-5 w-5 text-slate-300 sm:block" />}
       />
 
-      <DataTable columns={columns} rows={filtered} rowKey={(p) => p.id} emptyMessage="No transactions match your search." />
+      {loading ? (
+        <div className="flex h-64 items-center justify-center rounded-2xl border border-slate-200 bg-white">
+          <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={filtered}
+          rowKey={(p) => String(p.id || p.transactionRef)}
+          emptyMessage="No transactions match your search."
+        />
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRightLeft, MapPin, CalendarDays, Search, Users, ChevronDown, Plane } from "lucide-react";
 import { Airport } from "@/types";
@@ -21,7 +21,7 @@ function dateAfter(date: string) {
 
 type TripType = "one-way" | "round-trip";
 
-export function FlightSearchBar() {
+function FlightSearchBarForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialTripType: TripType =
@@ -43,9 +43,8 @@ export function FlightSearchBar() {
       .then((data) => {
         if (data.length > 0) {
           setAirports(data);
-          // Auto-select first two airports if available
-          if (!from && data[0]?.code) setFrom(data[0].code);
-          if (!to && data[1]?.code) setTo(data[1].code);
+          if (!from && data[0]?.code) setFrom(data[0].code || data[0].iataCode || "");
+          if (!to && data[1]?.code) setTo(data[1].code || data[1].iataCode || "");
         }
         setLoadingAirports(false);
       })
@@ -122,11 +121,14 @@ export function FlightSearchBar() {
                 className="h-12 w-full appearance-none rounded-xl border-2 border-slate-200 bg-slate-50 pl-9 pr-8 text-sm font-semibold text-slate-900 transition-colors focus:border-aviation-900 focus:bg-white focus:ring-2 focus:ring-aviation-900/10"
               >
                 {loadingAirports && <option value="">Loading…</option>}
-                {airports.map((a) => (
-                  <option key={a.code} value={a.code}>
-                    {a.city ?? a.name} ({a.code})
-                  </option>
-                ))}
+                {airports.map((a) => {
+                  const code = a.code || a.iataCode || "";
+                  return (
+                    <option key={code} value={code}>
+                      {a.city ?? a.name} ({code})
+                    </option>
+                  );
+                })}
               </select>
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             </div>
@@ -160,11 +162,14 @@ export function FlightSearchBar() {
                 className="h-12 w-full appearance-none rounded-xl border-2 border-slate-200 bg-slate-50 pl-9 pr-8 text-sm font-semibold text-slate-900 transition-colors focus:border-aviation-900 focus:bg-white focus:ring-2 focus:ring-aviation-900/10"
               >
                 {loadingAirports && <option value="">Loading…</option>}
-                {airports.map((a) => (
-                  <option key={a.code} value={a.code}>
-                    {a.city ?? a.name} ({a.code})
-                  </option>
-                ))}
+                {airports.map((a) => {
+                  const code = a.code || a.iataCode || "";
+                  return (
+                    <option key={code} value={code}>
+                      {a.city ?? a.name} ({code})
+                    </option>
+                  );
+                })}
               </select>
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             </div>
@@ -240,5 +245,13 @@ export function FlightSearchBar() {
         </div>
       </div>
     </form>
+  );
+}
+
+export function FlightSearchBar() {
+  return (
+    <Suspense fallback={<div className="h-28 rounded-2xl bg-white/20 animate-pulse" />}>
+      <FlightSearchBarForm />
+    </Suspense>
   );
 }

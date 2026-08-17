@@ -90,7 +90,14 @@ export default function BookingWizardPage() {
       const booking = await api.users.createBooking(flight.flightNumber, {
         user: { email: user.email },
         seatType: backendSeatType,
-        passengers: draft.passengers.map(({ uid: _uid, ...p }) => p),
+        passengers: draft.passengers.map((p) => ({
+          firstName: p.firstName,
+          lastName: p.lastName,
+          passengerType: p.passengerType,
+          dateOfBirth: p.dateOfBirth,
+          passportNumber: p.passportNumber,
+          nationality: p.nationality,
+        })),
         notes: "",
       });
 

@@ -168,7 +168,7 @@ export const MOCK_BOOKINGS: Booking[] = [
 ];
 
 export function getBookingsForUser(email: string): Booking[] {
-  return MOCK_BOOKINGS.filter((b) => b.bookedBy.toLowerCase() === email.toLowerCase());
+  return MOCK_BOOKINGS.filter((b) => (b.bookedBy || b.user?.email || "").toLowerCase() === email.toLowerCase());
 }
 
 export function findBookingByCode(code: string): Booking | undefined {

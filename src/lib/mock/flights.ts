@@ -59,11 +59,11 @@ function generateFlights(): Flight[] {
       const arrivalTime = new Date(departureTime.getTime() + route.durationMin * 60000);
 
       const seatsSoldRatio = 0.15 + rand() * 0.75;
-      const availableSeats = Math.max(0, Math.round(aircraft.seatCapacity * (1 - seatsSoldRatio)));
+      const availableSeats = Math.max(0, Math.round((aircraft.seatCapacity || aircraft.totalSeats || 180) * (1 - seatsSoldRatio)));
 
       const basePrice = 45 + Math.round(route.durationMin * 0.62);
 
-      const fareRules = aircraft.seatConfig.map((seg) => ({
+      const fareRules = (aircraft.seatConfig || []).map((seg) => ({
         cabin: seg.cabin,
         basePrice: Math.round(basePrice * seg.basePriceMultiplier),
         refundable: seg.cabin !== "ECONOMY",
@@ -85,7 +85,7 @@ function generateFlights(): Flight[] {
         arrivalTime: arrivalTime.toISOString(),
         airline,
         aircraft,
-        totalSeats: aircraft.seatCapacity,
+        totalSeats: aircraft.seatCapacity || aircraft.totalSeats || 180,
         availableSeats,
         fareRules,
         flightStatus: status,

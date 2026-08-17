@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Flight, FlightStatus } from "@/types";
-import { MOCK_AIRPORTS, MOCK_AIRLINES } from "@/lib/mock/airports-airlines";
-import { MOCK_AIRCRAFT } from "@/lib/mock/aircraft";
+import { useEffect, useState } from "react";
+import { Flight, FlightStatus, Airline, Airport, Aircraft } from "@/types";
+import { adminApi } from "@/lib/api/admin";
 import { Modal } from "@/components/ui/modal";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,63 +12,73 @@ interface FlightFormModalProps {
   open: boolean;
   initial?: Flight | null;
   onClose: () => void;
-  onSave: (payload: {
-    flightNumber: string;
-    airlineCode: string;
-    aircraftId: string;
-    departureCode: string;
-    destinationCode: string;
-    departureTime: string;
-    arrivalTime: string;
-    basePrice: number;
-    flightStatus: FlightStatus;
-  }, id?: string) => Promise<{ ok: boolean; code?: number; message?: string }>;
+  onSave: (
+    payload: {
+      flightNumber: string;
+      airlineCode: string;
+      aircraftId: string;
+      departureCode: string;
+      destinationCode: string;
+      departureTime: string;
+      arrivalTime: string;
+      basePrice: number;
+      flightStatus: FlightStatus;
+    },
+    id?: string
+  ) => Promise<{ ok: boolean; code?: number; message?: string }>;
 }
 
 function toLocalInputValue(iso?: string) {
   if (!iso) return "";
   const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
   const pad = (n: number) => n.toString().padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function buildInitialForm(initial?: Flight | null) {
-  return initial
-    ? {
-        flightNumber: initial.flightNumber,
-        airlineCode: initial.airline.iataCarrierCode,
-        aircraftId: initial.aircraft.id,
-        departureCode: initial.departureAirport.iataCode,
-        destinationCode: initial.destinationAirport.iataCode,
-        departureTime: toLocalInputValue(initial.departureTime),
-        arrivalTime: toLocalInputValue(initial.arrivalTime),
-        basePrice: initial.fareRules.find((r) => r.cabin === "ECONOMY")?.basePrice ?? 150,
-        flightStatus: initial.flightStatus,
-      }
-    : {
-        flightNumber: "",
-        airlineCode: MOCK_AIRLINES[0]?.iataCarrierCode ?? "",
-        aircraftId: MOCK_AIRCRAFT[0]?.id ?? "",
-        departureCode: MOCK_AIRPORTS[0]?.iataCode ?? "",
-        destinationCode: MOCK_AIRPORTS[1]?.iataCode ?? "",
-        departureTime: "",
-        arrivalTime: "",
-        basePrice: 150,
-        flightStatus: "SCHEDULED" as FlightStatus,
-      };
-}
-
 export function FlightFormModal({ open, initial, onClose, onSave }: FlightFormModalProps) {
-  const [form, setForm] = useState(() => buildInitialForm(initial));
+  const [airlines, setAirlines] = useState<Airline[]>([]);
+  const [airports, setAirports] = useState<Airport[]>([]);
+  const [aircrafts, setAircrafts] = useState<Aircraft[]>([]);
+
+  const [form, setForm] = useState({
+    flightNumber: initial?.flightNumber || "",
+    airlineCode: initial?.airline?.code || "",
+    aircraftId: initial?.aircraft?.code || initial?.aircraft?.model || "",
+    departureCode: initial?.departureAirport?.code || "",
+    destinationCode: initial?.destinationAirport?.code || "",
+    departureTime: toLocalInputValue(initial?.departureTime),
+    arrivalTime: toLocalInputValue(initial?.arrivalTime),
+    basePrice: initial?.basePrice || 150,
+    flightStatus: (initial?.flightStatus || "SCHEDULED") as FlightStatus,
+  });
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<{ code: number; message: string } | null>(null);
 
-  const aircraftForAirline = useMemo(
-    () => MOCK_AIRCRAFT.filter((a) => a.airlineCode === form.airlineCode),
-    [form.airlineCode]
-  );
+  useEffect(() => {
+    Promise.all([
+      adminApi.airlines.getAll().catch(() => []),
+      adminApi.airports.getAll().catch(() => []),
+      adminApi.aircrafts.getAll().catch(() => []),
+    ]).then(([alRes, apRes, acRes]) => {
+      setAirlines(alRes || []);
+      setAirports(apRes || []);
+      setAircrafts(acRes || []);
 
-  const sameAirportError = form.departureCode === form.destinationCode;
+      if (!initial) {
+        setForm((f) => ({
+          ...f,
+          airlineCode: f.airlineCode || alRes[0]?.code || "",
+          departureCode: f.departureCode || apRes[0]?.code || "",
+          destinationCode: f.destinationCode || apRes[1]?.code || apRes[0]?.code || "",
+          aircraftId: f.aircraftId || acRes[0]?.code || acRes[0]?.model || "",
+        }));
+      }
+    });
+  }, [initial]);
+
+  const sameAirportError = Boolean(form.departureCode && form.destinationCode && form.departureCode === form.destinationCode);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -82,7 +91,7 @@ export function FlightFormModal({ open, initial, onClose, onSave }: FlightFormMo
         departureTime: new Date(form.departureTime).toISOString(),
         arrivalTime: new Date(form.arrivalTime).toISOString(),
       },
-      initial?.id
+      initial?.id !== undefined ? String(initial.id) : undefined
     );
     setSaving(false);
     if (!result.ok) {
@@ -137,21 +146,24 @@ export function FlightFormModal({ open, initial, onClose, onSave }: FlightFormMo
             <Select
               id="airline"
               value={form.airlineCode}
-              onChange={(e) => {
-                const aircraftMatch = MOCK_AIRCRAFT.find((a) => a.airlineCode === e.target.value);
-                setForm({ ...form, airlineCode: e.target.value, aircraftId: aircraftMatch?.id ?? form.aircraftId });
-              }}
+              onChange={(e) => setForm({ ...form, airlineCode: e.target.value })}
             >
-              {MOCK_AIRLINES.map((al) => (
-                <option key={al.id} value={al.iataCarrierCode}>{al.operatorName}</option>
+              {airlines.map((al) => (
+                <option key={al.id || al.code} value={al.code}>{al.name}</option>
               ))}
             </Select>
           </div>
           <div>
-            <Label htmlFor="aircraft">Aircraft</Label>
-            <Select id="aircraft" value={form.aircraftId} onChange={(e) => setForm({ ...form, aircraftId: e.target.value })}>
-              {aircraftForAirline.map((ac) => (
-                <option key={ac.id} value={ac.id}>{ac.model} ({ac.tailRegistration})</option>
+            <Label htmlFor="aircraft">Aircraft Code / Model</Label>
+            <Select
+              id="aircraft"
+              value={form.aircraftId}
+              onChange={(e) => setForm({ ...form, aircraftId: e.target.value })}
+            >
+              {aircrafts.map((ac) => (
+                <option key={ac.id || ac.code} value={ac.code || ac.model}>
+                  {ac.model} ({ac.code || ac.tailRegistration})
+                </option>
               ))}
             </Select>
           </div>
@@ -160,17 +172,29 @@ export function FlightFormModal({ open, initial, onClose, onSave }: FlightFormMo
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <Label htmlFor="departureCode">Departure hub</Label>
-            <Select id="departureCode" value={form.departureCode} onChange={(e) => setForm({ ...form, departureCode: e.target.value })}>
-              {MOCK_AIRPORTS.map((ap) => (
-                <option key={ap.id} value={ap.iataCode}>{ap.city} ({ap.iataCode})</option>
+            <Select
+              id="departureCode"
+              value={form.departureCode}
+              onChange={(e) => setForm({ ...form, departureCode: e.target.value })}
+            >
+              {airports.map((ap) => (
+                <option key={ap.id || ap.code} value={ap.code}>
+                  {ap.city || ap.name} ({ap.code})
+                </option>
               ))}
             </Select>
           </div>
           <div>
             <Label htmlFor="destinationCode">Destination</Label>
-            <Select id="destinationCode" value={form.destinationCode} onChange={(e) => setForm({ ...form, destinationCode: e.target.value })}>
-              {MOCK_AIRPORTS.map((ap) => (
-                <option key={ap.id} value={ap.iataCode}>{ap.city} ({ap.iataCode})</option>
+            <Select
+              id="destinationCode"
+              value={form.destinationCode}
+              onChange={(e) => setForm({ ...form, destinationCode: e.target.value })}
+            >
+              {airports.map((ap) => (
+                <option key={ap.id || ap.code} value={ap.code}>
+                  {ap.city || ap.name} ({ap.code})
+                </option>
               ))}
             </Select>
           </div>
@@ -200,7 +224,7 @@ export function FlightFormModal({ open, initial, onClose, onSave }: FlightFormMo
         </div>
 
         <div>
-          <Label htmlFor="basePrice">Base economy price (USD)</Label>
+          <Label htmlFor="basePrice">Base price (USD)</Label>
           <Input
             id="basePrice"
             type="number"
@@ -209,9 +233,6 @@ export function FlightFormModal({ open, initial, onClose, onSave }: FlightFormMo
             onChange={(e) => setForm({ ...form, basePrice: parseInt(e.target.value) || 0 })}
             required
           />
-          <p className="mt-1.5 text-xs text-slate-400">
-            Premium Economy, Business, and First fares are derived from the aircraft&apos;s cabin price multipliers.
-          </p>
         </div>
 
         <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">

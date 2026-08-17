@@ -86,19 +86,22 @@ export function FlightFilterSidebar({ filters, onChange, priceCeiling }: FilterS
           {airlines.length === 0 ? (
             <p className="text-xs text-slate-400">Loading airlines…</p>
           ) : (
-            airlines.map((al) => (
-              <label key={al.id ?? al.code} className="flex items-center gap-2.5 text-sm text-slate-700 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={filters.airlines.includes(al.code)}
-                  onChange={() =>
-                    onChange({ ...filters, airlines: toggle(filters.airlines, al.code) })
-                  }
-                  className="h-4 w-4 rounded border-slate-300 text-aviation-900 focus:ring-aviation-900/20 cursor-pointer"
-                />
-                <span className="group-hover:text-aviation-900 transition-colors">{al.name}</span>
-              </label>
-            ))
+            airlines.map((al) => {
+              const code = al.code || al.iataCarrierCode || "";
+              return (
+                <label key={al.id ?? code} className="flex items-center gap-2.5 text-sm text-slate-700 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={filters.airlines.includes(code)}
+                    onChange={() =>
+                      onChange({ ...filters, airlines: toggle(filters.airlines, code) })
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-aviation-900 focus:ring-aviation-900/20 cursor-pointer"
+                  />
+                  <span className="group-hover:text-aviation-900 transition-colors">{al.name || al.operatorName}</span>
+                </label>
+              );
+            })
           )}
         </div>
       </div>

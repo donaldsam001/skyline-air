@@ -85,7 +85,14 @@ export const useBookingDraft = create<BookingDraftState>((set, get) => ({
       const booking = await api.users.createBooking(state.flight.flightNumber, {
         user: { email: userEmail },
         seatType: backendSeatType,
-        passengers: state.passengers.map(({ uid: _uid, ...p }) => p),
+        passengers: state.passengers.map((p) => ({
+          firstName: p.firstName,
+          lastName: p.lastName,
+          passengerType: p.passengerType,
+          dateOfBirth: p.dateOfBirth,
+          passportNumber: p.passportNumber,
+          nationality: p.nationality,
+        })),
         notes: "",
       });
 
